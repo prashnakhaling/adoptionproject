@@ -1,0 +1,1384 @@
+/* homepage */
+/* ================================
+   GLOBAL BOX SIZING & OVERFLOW FIX
+================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #fefefe;
+  color: #333;
+}
+/* 
+header {
+  background-color: #adb2d4;
+  color: white;
+  padding: 1.5rem;
+  text-align: center;
+} */
+
+/* nav {
+  display: flex;
+  justify-content: center;
+  background: #f2f2f2;
+  padding: 1rem;
+}
+
+nav a {
+  margin: 0 1rem;
+  text-decoration: none;
+  color: #333;
+} */
+
+.hero-image {
+  background-image: url("images/bgimage.jpg");
+  height: 800px;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hero-text {
+  color: transparent;
+  background: linear-gradient(
+    to right,
+    rgb(244, 244, 246) 50%,
+    rgb(67, 75, 121) 50%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-text h1 {
+  font-size: 3rem;
+}
+
+.hero-text p {
+  font-size: 1.2rem;
+}
+
+.quizzle-container {
+  width: 80%;
+  margin: 2rem auto;
+}
+
+.quizzle-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  /* space between cards */
+  justify-content: center;
+}
+
+.quizzle-card {
+  flex: 1 1 calc(50% - 1.5rem);
+  /* 50% width minus gap */
+  max-width: calc(20% - 1.5rem);
+  box-sizing: border-box;
+}
+
+.quizzle-card button,
+.quizzle-card a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  background: #fff;
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  width: 100%;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.3s ease;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.quizzle-card button:hover,
+.quizzle-card a:hover {
+  border-color: #5a9;
+  box-shadow: 0 8px 15px rgba(90, 153, 100, 0.3);
+  color: #2a6a2a;
+}
+
+.quizzle-card i {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+  color: #5a9;
+}
+
+.quizzle-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .quizzle-card {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
+.fa-dog {
+  color: #ff6f61;
+  font-size: 120px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
+  cursor: pointer;
+}
+
+.fa-dog:hover {
+  color: #ff3b1f;
+  transform: scale(1.2) rotate(10deg);
+}
+
+.fa-house {
+  color: #4a90e2;
+  font-size: 100px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
+  cursor: pointer;
+}
+
+.fa-house:hover {
+  color: #2c5dab;
+  transform: scale(1.1) translateY(-10px);
+}
+
+.fa-hippo {
+  color: #9b59b6;
+
+  font-size: 110px;
+  text-shadow: 1.5px 1.5px 4px rgba(0, 0, 0, 0.25);
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
+  cursor: pointer;
+}
+
+.fa-hippo:hover {
+  color: #6c3483;
+  transform: scale(1.15) rotate(-10deg);
+}
+
+.fa-cat {
+  color: #f39c12;
+  font-size: 105px;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.3s ease,
+    color 0.3s ease;
+  cursor: pointer;
+}
+
+.fa-cat:hover {
+  color: #d35400;
+  transform: scale(1.2) translateX(10px);
+}
+
+.center-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.center-container p {
+  display: inline-block;
+  font-size: 24px;
+  text-align: center;
+}
+
+.animated-text {
+  font-size: 24px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 1s ease-out,
+    transform 1s ease-out;
+}
+
+.animated-text.visible {
+  /* Animation styles */
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 1s ease-out forwards;
+}
+
+.dogs-showcase {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.dog-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 1rem;
+  padding: 1rem;
+  width: 250px;
+  text-align: center;
+  background-color: #fff;
+}
+
+.dog-card img {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.viewmore {
+  text-align: right;
+  margin: 2rem;
+  margin-top: 50px;
+}
+
+.btn {
+  background-color: white;
+  color: black;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+  background-color: #3e8e41;
+}
+
+.users-section.hide {
+  display: none;
+}
+
+footer {
+  background: #adb2d4;
+  color: white;
+  text-align: center;
+  padding: 1rem;
+  margin-top: 2rem;
+}
+
+#page-slide-container {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 100%;
+  height: 100%;
+  background: white;
+  z-index: 1000;
+  transition: right 0.5s ease;
+}
+
+#page-slide-container.open {
+  right: 0;
+}
+/* Header styling */
+.site-header {
+  width: 100%;
+  background-color: #cdcdd1;
+  /* background-color: #adb2d4; */
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 120px;
+  gap: 2rem;
+  /* padding: 1rem 5%; */
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo img {
+  height: 180px;
+  display: block;
+}
+
+.nav-container {
+  display: flex;
+  justify-content: center;
+  padding: 0 2rem;
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+}
+
+.main-nav a {
+  position: relative;
+  text-decoration: none;
+  color: #1a1a1a;
+  padding-bottom: 4px;
+}
+.main-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: #1a1a1a;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+
+.main-nav a:hover::after {
+  transform: scaleX(1);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.donate-btn {
+  text-decoration: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  background: #b5baff;
+  color: #1a1a1a;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 26px;
+  height: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  z-index: 1001;
+}
+
+.menu-toggle span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: #222;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.menu-toggle.active span:nth-child(1) {
+  transform: translateY(9px) rotate(45deg);
+}
+
+.menu-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.menu-toggle.active span:nth-child(3) {
+  transform: translateY(-9px) rotate(-45deg);
+}
+
+@media (max-width: 992px) {
+  .header-container {
+    padding: 1rem 4%;
+  }
+
+  .main-nav {
+    gap: 1.5rem;
+  }
+}
+@media (max-width: 992px) {
+  .header-container {
+    padding: 1rem 4%;
+  }
+
+  .main-nav {
+    gap: 1.5rem;
+  }
+}
+
+/* =========================
+   MOBILE NAVIGATION
+   ========================= */
+
+@media (max-width: 768px) {
+  .site-header {
+    width: 100%;
+  }
+
+  .header-container {
+    height: 90px;
+    padding: 0.5rem 4%;
+    gap: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Reduce logo size on mobile */
+  .logo img {
+    height: 90px;
+    width: auto;
+    display: block;
+  }
+
+  .nav-container {
+    padding: 0;
+    margin-left: auto;
+  }
+
+  /* Hide desktop navigation and turn it into mobile side menu */
+  .main-nav {
+    position: fixed;
+
+    top: 0;
+    right: 0;
+
+    width: 180px;
+    max-width: 85vw;
+    height: 100vh;
+
+    box-sizing: border-box;
+
+    display: flex;
+    flex-direction: column;
+
+    justify-content: flex-start;
+    align-items: flex-start;
+
+    gap: 1.8rem;
+
+    background: #fff;
+
+    padding: 90px 2rem 2rem;
+
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.15);
+
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+
+    z-index: 1000;
+
+    overflow-y: auto;
+  }
+
+  /* When hamburger is clicked */
+  .main-nav.open {
+    transform: translateX(0);
+  }
+
+  /* Make mobile nav links visible */
+  .main-nav a {
+    display: block;
+    width: 100%;
+
+    color: #1a1a1a;
+    text-decoration: none;
+
+    padding: 0.5rem 0;
+  }
+
+  /* Hamburger */
+  .menu-toggle {
+    display: flex;
+
+    flex-direction: column;
+    justify-content: space-between;
+
+    width: 30px;
+    height: 24px;
+
+    background: transparent;
+    border: none;
+
+    cursor: pointer;
+    padding: 0;
+
+    flex-shrink: 0;
+
+    z-index: 1001;
+  }
+
+  .menu-toggle span {
+    display: block;
+
+    width: 100%;
+    height: 3px;
+
+    background: #222;
+
+    border-radius: 2px;
+
+    transition:
+      transform 0.3s ease,
+      opacity 0.3s ease;
+  }
+
+  /* Hamburger -> X */
+  .menu-toggle.active span:nth-child(1) {
+    transform: translateY(10.5px) rotate(45deg);
+  }
+
+  .menu-toggle.active span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .menu-toggle.active span:nth-child(3) {
+    transform: translateY(-10.5px) rotate(-45deg);
+  }
+
+  /* Keep Donate and Login buttons usable */
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+
+    flex-shrink: 0;
+  }
+
+  .donate-btn {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* =========================
+   SMALL MOBILE
+   ========================= */
+
+@media (max-width: 480px) {
+  .header-container {
+    height: 80px;
+    padding: 0.4rem 3%;
+    gap: 0.5rem;
+  }
+
+  .logo img {
+    height: 75px;
+  }
+
+  .header-actions {
+    gap: 0.4rem;
+  }
+
+  .donate-btn {
+    padding: 0.45rem 0.65rem;
+    font-size: 0.8rem;
+    gap: 5px;
+  }
+
+  .menu-toggle {
+    width: 27px;
+    height: 22px;
+  }
+}
+/* adoption option section */
+.adoption-option-section {
+  width: 100%;
+  min-height: 190px;
+  height: auto;
+  padding: 40px 40px;
+}
+.adoption {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 25px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.adoption-option {
+  flex: 1;
+  text-align: center;
+  padding: 30px 25px;
+}
+.adoption-option i {
+  width: 60px;
+  height: 60px;
+  background-color: #b5baff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: #5a34ae;
+  margin: 0 auto 18px;
+}
+.dog-container {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  padding: 30px;
+}
+
+.dog-card {
+  width: 300px;
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.dog-image {
+  width: 100%;
+  height: 240px;
+  overflow: hidden;
+}
+
+.dog-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dog-details {
+  padding: 20px;
+}
+
+.dog-details h3 {
+  margin-bottom: 10px;
+}
+
+.adopt-btn {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 10px 20px;
+  background: #5a34ae;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+}
+/* ================================
+   AVAILABLE DOGS SECTION
+================================ */
+
+.available-dogs {
+  width: 100%;
+  padding: 80px 6%;
+  background-color: #b5baff;
+}
+
+/* Section heading */
+
+.section-heading {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 45px;
+}
+
+.section-subtitle {
+  display: inline-block;
+  color: #5a34ae;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 38px;
+  color: #302345;
+  font-weight: 700;
+}
+
+.section-heading p {
+  margin-top: 12px;
+  color: #777080;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ================================
+   DOG CONTAINER
+================================ */
+.dog-container {
+  width: 100%;
+  max-width: 1250px;
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+
+  box-sizing: border-box;
+}
+
+.dog-card {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid #eee8f5;
+  box-shadow: 0 8px 25px rgba(90, 52, 174, 0.08);
+  transition: all 0.3s ease;
+}
+
+.dog-card:hover {
+  transform: translateY(-7px);
+
+  box-shadow: 0 15px 35px rgba(90, 52, 174, 0.15);
+}
+
+/* ================================
+   DOG IMAGE
+================================ */
+
+.dog-image {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: #eee8f5;
+}
+
+.dog-image img {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+  object-position: center;
+
+  display: block;
+
+  transition: transform 0.4s ease;
+}
+
+.dog-card:hover .dog-image img {
+  transform: scale(1.05);
+}
+
+/* ================================
+   DOG DETAILS
+================================ */
+
+.dog-details {
+  padding: 18px 20px 20px;
+}
+
+.dog-details h3 {
+  margin: 0 0 12px;
+
+  font-size: 20px;
+  color: #302345;
+  font-weight: 700;
+}
+
+/* Age */
+
+.dog-info {
+  margin-bottom: 18px;
+}
+
+.dog-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  color: #777080;
+  font-size: 14px;
+}
+
+.dog-info i {
+  color: #5a34ae;
+}
+
+/* ================================
+   VIEW DOG BUTTON
+================================ */
+
+.view-dog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  color: #5a34ae;
+  font-size: 14px;
+  font-weight: 600;
+
+  text-decoration: none;
+
+  transition: all 0.3s ease;
+}
+
+.view-dog-btn:hover {
+  color: #48258f;
+  gap: 12px;
+}
+
+/* ================================
+   VIEW ALL BUTTON
+================================ */
+
+.view-all-container {
+  text-align: center;
+  margin-top: 45px;
+}
+
+.view-all-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  padding: 13px 28px;
+
+  background: #5a34ae;
+  color: #ffffff;
+
+  border-radius: 10px;
+
+  text-decoration: none;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  box-shadow: 0 7px 18px rgba(90, 52, 174, 0.22);
+
+  transition: all 0.3s ease;
+}
+
+.view-all-btn:hover {
+  background: #48258f;
+  transform: translateY(-2px);
+}
+/* =========================================
+   WHY ADOPT SECTION
+========================================= */
+
+.why-adopt {
+  width: 100%;
+  background: #ffffff;
+  padding: 36px 7% 28px;
+}
+
+.why-container {
+  max-width: 1000px;
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: 43% 57%;
+  align-items: center;
+
+  gap: 50px;
+}
+
+/* =========================================
+   IMAGE
+========================================= */
+
+.why-image {
+  position: relative;
+  width: 100%;
+}
+
+.why-image img {
+  width: 100%;
+  height: 220px;
+
+  display: block;
+
+  object-fit: cover;
+
+  border-radius: 10px;
+}
+
+/* Purple heart decoration */
+
+.heart-decoration {
+  position: absolute;
+
+  right: 22px;
+  top: 82px;
+
+  color: #9b62df;
+
+  font-size: 58px;
+  font-weight: 400;
+
+  transform: rotate(-12deg);
+
+  z-index: 2;
+}
+
+/* Purple brush below image */
+
+.purple-brush {
+  position: absolute;
+
+  width: 145px;
+  height: 12px;
+
+  left: 35px;
+  bottom: -7px;
+
+  background: #8b51d5;
+
+  border-radius: 50%;
+
+  transform: rotate(-3deg);
+
+  z-index: 2;
+}
+
+.purple-brush::after {
+  content: "";
+
+  position: absolute;
+
+  width: 110px;
+  height: 6px;
+
+  left: 18px;
+  top: 7px;
+
+  background: #b38be6;
+
+  border-radius: 50%;
+}
+
+/* =========================================
+   WHY ADOPT CONTENT
+========================================= */
+
+.why-content {
+  padding: 0;
+}
+
+.section-label {
+  color: #7042b8;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  letter-spacing: 1.5px;
+
+  margin-bottom: 5px;
+}
+
+.why-content h2 {
+  color: #292052;
+
+  font-size: 29px;
+  font-weight: 800;
+
+  line-height: 1.2;
+
+  margin: 0 0 10px;
+}
+
+.description {
+  color: #51506a;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  line-height: 1.45;
+
+  max-width: 570px;
+
+  margin: 0 0 16px;
+}
+
+/* =========================================
+   BENEFITS
+========================================= */
+
+.benefits {
+  display: flex;
+
+  align-items: center;
+
+  width: 100%;
+
+  margin-bottom: 14px;
+}
+
+.benefit {
+  display: flex;
+
+  align-items: center;
+
+  gap: 9px;
+
+  color: #393354;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  padding-right: 20px;
+  margin-right: 18px;
+
+  border-right: 1px solid #e8e3f1;
+}
+
+.benefit:last-child {
+  padding-right: 0;
+  margin-right: 0;
+  border-right: none;
+}
+
+.benefit-icon {
+  color: #6940c2;
+
+  font-size: 29px;
+
+  line-height: 1;
+
+  width: 25px;
+
+  text-align: center;
+}
+
+/* =========================================
+   OUR STORY BUTTON
+========================================= */
+
+.story-button {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 9px;
+
+  padding: 8px 24px;
+
+  background: linear-gradient(90deg, #6035b5, #7042c8);
+
+  color: #ffffff;
+
+  border-radius: 20px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  text-decoration: none;
+
+  box-shadow: 0 4px 8px rgba(88, 48, 169, 0.15);
+
+  transition: all 0.2s ease;
+}
+
+.story-button span {
+  font-size: 16px;
+}
+
+.story-button:hover {
+  background: #51299e;
+
+  transform: translateY(-1px);
+}
+
+/* =========================================
+   CALL TO ACTION SECTION
+========================================= */
+
+.cta-section {
+  width: 100%;
+
+  background: #ffffff;
+
+  padding: 10px 7% 16px;
+}
+
+.cta-box {
+  position: relative;
+
+  width: 100%;
+  max-width: 1080px;
+
+  min-height: 92px;
+
+  margin: 0 auto;
+
+  display: flex;
+
+  align-items: center;
+
+  padding: 14px 55px;
+
+  border-radius: 14px;
+
+  background:
+    radial-gradient(
+      circle at 8% 50%,
+      rgba(190, 160, 240, 0.18),
+      transparent 25%
+    ),
+    #f5f0ff;
+
+  overflow: hidden;
+}
+
+/* =========================================
+   CTA DOG ICON
+========================================= */
+
+.dog-symbol {
+  width: 65px;
+
+  flex-shrink: 0;
+
+  margin-right: 20px;
+
+  text-align: center;
+
+  font-size: 45px;
+
+  line-height: 1;
+}
+
+/* =========================================
+   CTA TEXT
+========================================= */
+
+.cta-text {
+  flex: 1;
+
+  position: relative;
+
+  z-index: 2;
+}
+
+.cta-text h2 {
+  color: #322457;
+
+  font-size: 20px;
+  font-weight: 800;
+
+  line-height: 1.2;
+
+  margin: 0 0 5px;
+}
+
+.cta-text p {
+  color: #5b5670;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  margin: 0;
+}
+
+/* =========================================
+   BROWSE BUTTON
+========================================= */
+
+.browse-button {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  min-width: 200px;
+
+  padding: 11px 22px;
+
+  background: linear-gradient(90deg, #6035b5, #7042c8);
+
+  color: #ffffff;
+
+  border-radius: 25px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  text-decoration: none;
+
+  box-shadow: 0 4px 8px rgba(91, 48, 174, 0.15);
+
+  transition: all 0.2s ease;
+
+  position: relative;
+  z-index: 2;
+}
+
+.browse-button span {
+  font-size: 16px;
+}
+
+.browse-button:hover {
+  background: #51299e;
+
+  transform: translateY(-1px);
+}
+
+/* =========================================
+   CTA PAW DECORATIONS
+========================================= */
+
+.paw {
+  position: absolute;
+
+  color: #ded2f4;
+
+  font-size: 24px;
+
+  opacity: 0.8;
+
+  z-index: 1;
+}
+
+.paw-1 {
+  left: 35px;
+  top: 20px;
+}
+
+.paw-2 {
+  left: 30px;
+  bottom: 10px;
+}
+
+.paw-3 {
+  right: 365px;
+  bottom: 13px;
+}
+
+.paw-4 {
+  right: 38px;
+  top: 23px;
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 900px) {
+  .why-container {
+    grid-template-columns: 1fr;
+
+    gap: 30px;
+
+    max-width: 650px;
+  }
+
+  .why-image img {
+    height: 280px;
+  }
+
+  .benefits {
+    flex-wrap: wrap;
+
+    gap: 10px;
+  }
+
+  .cta-box {
+    padding: 20px 30px;
+  }
+}
+
+@media (max-width: 600px) {
+  .why-adopt {
+    padding: 30px 20px;
+  }
+
+  .why-container {
+    display: block;
+  }
+
+  .why-image {
+    margin-bottom: 30px;
+  }
+
+  .why-image img {
+    height: 220px;
+  }
+
+  .why-content h2 {
+    font-size: 26px;
+  }
+
+  .description {
+    font-size: 13px;
+  }
+
+  .benefits {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 12px;
+  }
+
+  .benefit {
+    border-right: none;
+
+    padding-right: 0;
+    margin-right: 0;
+  }
+
+  .cta-section {
+    padding: 10px 20px 20px;
+  }
+
+  .cta-box {
+    flex-direction: column;
+
+    text-align: center;
+
+    gap: 12px;
+
+    padding: 25px 20px;
+  }
+
+  .dog-symbol {
+    margin-right: 0;
+  }
+
+  .browse-button {
+    width: 100%;
+  }
+
+  .paw {
+    display: none;
+  }
+}
