@@ -1,63 +1,83 @@
-<?php
-session_start();
-ob_start();
+<?php require __DIR__ . '/includes/header.php';
+require_once __DIR__ . "/admin/dataconnection.php";
+?>
+<!DOCTYPE html>
+<html lang="en">
 
-// Database configuration
-$host = 'localhost';
-$dbname = 'dogadoption';
-$user = 'root';
-$pass = '';
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="assets/style.css">
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
-}
+    <title>Sign In / Sign Up</title>
+    <style>
 
-// Handle login form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password = isset($_POST['password']) ? $_POST['password'] : '';
+    </style>
+</head>
 
-    if (empty($email) || empty($password)) {
-        $_SESSION['login_error'] = "Both email and password are required.";
-        header("Location: homepage.php");
-        exit();
-    }
+<body>
+    <section class="main-form-container">
 
-    // Try logging in as a regular user
-    $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        <div class="login-container" id="loginContainer">
+            <div class="login-form-panel login-form-panel--signup">
+                <form class="login-form" onsubmit="return false;">
+                    <h1 class="login-title">Create Account</h1>
+                    <!-- <div class="login-social">
+                        <a href="#" class="login-social-link" aria-label="Sign up with Facebook">f</a>
+                        <a href="#" class="login-social-link" aria-label="Sign up with Google">G+</a>
+                        <a href="#" class="login-social-link" aria-label="Sign up with LinkedIn">in</a>
+                    </div>
+                    <span class="login-subtext">or use your email for registration</span> -->
+                    <input type="text" class="login-input" placeholder="Name" autocomplete="name">
+                    <input type="email" class="login-input" placeholder="Email" autocomplete="email">
+                    <input type="password" class="login-input" placeholder="Password" autocomplete="new-password">
+                    <button type="submit" class="login-button">Sign Up</button>
+                </form>
+            </div>
 
-    if (!empty($user) && password_verify($password, $user['password'])) {
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['username'] = $user['name'];
-        $_SESSION['login_success'] = "Welcome, " . htmlspecialchars($user['name']) . "!";
-        header("Location: userdashboard.php");
-        exit();
-    };
+            <div class="login-form-panel login-form-panel--signin">
+                <form class="login-form" onsubmit="return false;">
+                    <h1 class="login-title">Log In Form</h1>
+                    <!-- <div class="login-social">
+                        <a href="#" class="login-social-link" aria-label="Sign in with Facebook">f</a>
+                        <a href="#" class="login-social-link" aria-label="Sign in with Google">G+</a>
+                        <a href="#" class="login-social-link" aria-label="Sign in with LinkedIn">in</a>
+                    </div> -->
+                    <!-- <span class="login-subtext">or use your account</span> -->
+                    <input type="email" class="login-input" placeholder="Email" autocomplete="email">
+                    <input type="password" class="login-input" placeholder="Password" autocomplete="current-password">
+                    <a href="#" class="login-link">Forgot your password?</a>
+                    <button type="submit" class="login-button">Log In</button>
+                </form>
+            </div>
 
-    // Try logging in as an admin (plain-text password match)
-    $stmt = $pdo->prepare("SELECT * FROM admin WHERE email = ?");
-    $stmt->execute([$email]);
-    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+            <div class="login-overlay-container">
+                <div class="login-overlay">
+                    <div class="login-overlay-panel login-overlay-panel--left">
+                        <h3 class="login-title">Welcome Back!</h3>
+                        <p class="login-text">Already have an account?</p>
+                        <button class="login-button login-button--ghost" id="loginSignIn">Log in</button>
+                    </div>
+                    <div class="login-overlay-panel login-overlay-panel--right">
+                        <h3 class="login-title">Welcome Back!</h3>
+                        <p class="login-text">Create an account?</p>
+                        <button class="login-button login-button--ghost" id="loginSignUp">Sign Up</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    if ($admin && $password === $admin['password']) {
-        $_SESSION['admin_id'] = $admin['id'];
-        $_SESSION['admin_name'] = $admin['name'];
-        $_SESSION['login_success'] = "Welcome, Admin " . htmlspecialchars($admin['name']) . "!";
-        header("Location: admindashboard.php");
-        exit();
-    }
-    session_start();
+        <script>
+            const loginContainer = document.getElementById('loginContainer');
+            document.getElementById('loginSignUp').addEventListener('click', () => {
+                loginContainer.classList.add('login-container--active');
+            });
+            document.getElementById('loginSignIn').addEventListener('click', () => {
+                loginContainer.classList.remove('login-container--active');
+            });
+        </script>
 
-    $_SESSION['user_id'] = $row['id'];
-    $_SESSION['username'] = $row['fullname']; // or $row['name'], depending on your database
+    </section>
+</body>
 
-    // Invalid credentials
-    $_SESSION['login_error'] = "Invalid email or password.";
-    header("Location: homepage.php");
-    exit();
-}
+</html>

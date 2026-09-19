@@ -18,13 +18,13 @@
     <div class="header-container">
 
         <div class="logo-container">
-            <a href="/dogadoption.loc/" class="logo">
+            <a href="http://adoptionproject.loc/" class="logo">
                 <img src="assets/images/happy-tails.png" alt="Happy Tails Logo" />
             </a>
         </div>
         <div class="nav-container">
             <nav class="main-nav" id="mainNav">
-                <a href="/dogadoption.loc/"><strong>Home</strong></a>
+                <a href="http://adoptionproject.loc/"><strong>Home</strong></a>
                 <a href="#"><strong>About Us</strong></a>
                 <a href="#"><strong>Available Dogs</strong></a>
                 <a href="#"><strong>Adopt Dog</strong></a>
@@ -34,7 +34,7 @@
 
         <div class="header-actions">
             <a href="#" class="donate-btn"> <i class="fa-regular fa-heart"></i><strong>Donate</strong></a>
-            <a href="form.php" class="donate-btn"><i class="fa-regular fa-user"></i> <strong>Log In</strong></a>
+            <a href="login.php" class="donate-btn"><i class="fa-regular fa-user"></i> <strong>Log In</strong></a>
             <!-- Hamburger -->
             <button
                 type="button"
