@@ -1,58 +1,152 @@
 <?php
-ob_start(); // Prevent headers already sent
-session_start();
 
-$host = 'localhost';
-$dbname = 'dogadoption';
-$user = 'root';
-$pass = '';
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("DB connection failed: " . $e->getMessage());
-}
+require_once __DIR__ . '/admin/dataconnection.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $password = isset($_POST['password']) ? $_POST['password'] : '';
+$errors = [];
 
-    // Basic validation
-    if (empty($username) || empty($email) || empty($password)) {
-        $_SESSION['signup_error'] = "All fields are required.";
-        header("Location: homepage.php");
-        exit();
-    }
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup'])) {
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $_SESSION['signup_error'] = "Invalid email format.";
-        header("Location: homepage.php");
-        exit();
-    }
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-    // Check if username or email already exists
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE name = ? OR email = ?");
-    $stmt->execute([$username, $email]);
 
-    if ($stmt->rowCount() > 0) {
-        $_SESSION['signup_error'] = "Username or email already exists.";
-        header("Location: homepage.php");
-        exit();
-    }
+    // =========================
+    // NAME VALIDATION
+    // =========================
 
-    // Hash password and insert new user
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+    if ($name === '') {
 
-    if ($stmt->execute([$username, $email, $hashedPassword])) {
-        $_SESSION['signup_success'] = "Signup successful! You can now log in.";
-        header("Location: homepage.php");
-        exit();
+        $errors['name'] = "Name is required.";
+
+    } elseif (strlen($name) < 6) {
+
+        $errors['name'] = "Name must be at least 6 characters long.";
+
+    } elseif (!preg_match("/^[A-Za-z ]+$/", $name)) {
+
+        $errors['name'] = "Name can contain letters and spaces only.";
+
     } else {
-        $_SESSION['signup_error'] = "Signup failed. Please try again.";
-        header("Location: homepage.php");
-        exit();
+
+        // Check if name already exists
+        $stmt = $conn->prepare(
+            "SELECT name FROM users WHERE name = ? LIMIT 1"
+        );
+
+        $stmt->bind_param("s", $name);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        if ($result->num_rows > 0) {
+            $errors['name'] = "This name is already registered.";
+        }
+
+        $stmt->close();
+    }
+
+
+    // =========================
+    // EMAIL VALIDATION
+    // =========================
+
+    if ($email === '') {
+
+        $errors['email'] = "Email is required.";
+
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+
+        $errors['email'] = "Please enter a valid email address.";
+
+    } elseif (!preg_match("/^[A-Za-z0-9._%+-]+@gmail\.com$/", $email)) {
+
+        $errors['email'] = "Please use a Gmail address ending with @gmail.com.";
+
+    } else {
+
+        // Check if email already exists
+        $stmt = $conn->prepare(
+            "SELECT email FROM users WHERE email = ? LIMIT 1"
+        );
+
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+
+        if ($result->num_rows > 0) {
+            $errors['email'] = "This email is already registered.";
+        }
+
+        $stmt->close();
+    }
+
+
+    // =========================
+    // PASSWORD VALIDATION
+    // =========================
+
+    if ($password === '') {
+
+        $errors['password'] = "Password is required.";
+
+    } elseif (strlen($password) < 8) {
+
+        $errors['password'] =
+            "Password must be at least 8 characters long.";
+
+    } elseif (!preg_match("/[0-9]/", $password)) {
+
+        $errors['password'] =
+            "Password must contain at least one number.";
+
+    } elseif (!preg_match("/[^A-Za-z0-9]/", $password)) {
+
+        $errors['password'] =
+            "Password must contain at least one special character.";
+    }
+
+
+    // =========================
+    // INSERT INTO DATABASE
+    // =========================
+
+    if (empty($errors)) {
+
+        $hashedPassword = password_hash(
+            $password,
+            PASSWORD_DEFAULT
+        );
+
+        $stmt = $conn->prepare(
+            "INSERT INTO users (name, email, password)
+             VALUES (?, ?, ?)"
+        );
+
+        $stmt->bind_param(
+            "sss",
+            $name,
+            $email,
+            $hashedPassword
+        );
+
+        if ($stmt->execute()) {
+
+            // Account created
+            header("Location: login.php?signup=success");
+            exit();
+
+        } else {
+
+            $errors['general'] =
+                "Unable to create account. Please try again.";
+        }
+
+        $stmt->close();
     }
 }
+?>

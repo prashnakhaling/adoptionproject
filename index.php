@@ -369,7 +369,7 @@ $result = mysqli_query($conn, $sql);
 
             </div>
 
-            <a href="#" class="browse-button">
+            <a href="availabledogs.php" class="browse-button">
                 Browse Available Dogs
                 <span>→</span>
             </a>

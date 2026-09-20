@@ -26,8 +26,8 @@
             <nav class="main-nav" id="mainNav">
                 <a href="http://adoptionproject.loc/"><strong>Home</strong></a>
                 <a href="#"><strong>About Us</strong></a>
-                <a href="#"><strong>Available Dogs</strong></a>
-                <a href="#"><strong>Adopt Dog</strong></a>
+                <a href="/availabledogs.php"><strong>Available Dogs</strong></a>
+                <a href="/adoptionform.php"><strong>Adopt Dog</strong></a>
                 <a href="#"><strong>Stories</strong></a>
             </nav>
         </div>
