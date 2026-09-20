@@ -1,826 +1,404 @@
 <?php require __DIR__ . '/includes/header.php'; ?>
-
 <?php
 session_start();
 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 require_once __DIR__ . '/admin/dataconnection.php';
 
-$usernameVerified = false;
-$userData = null;
-$message = "";
-$messageType = "";
 
-/* -----------------------------
-   CHECK USERNAME
------------------------------- */
-if (isset($_POST['check_username'])) {
+$self = basename(__FILE__);
 
-    $username = trim($_POST['username']);
+/*
+ * STEP 1: Check whether the entered username exists in the `users`
+ * table (database: dogadoption).
+ */
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['check_user'])) {
 
-    if ($username === "") {
+    $username = trim($_POST['username'] ?? '');
+    $errors = [];
 
-        $message = "Please enter your username.";
-        $messageType = "error";
+    if ($username === '') {
+
+        $errors['username'] = "Username is required.";
     } else {
 
-        $stmt = $conn->prepare(
-            "SELECT id, name, email 
-             FROM user 
-             WHERE name = ? 
-             LIMIT 1"
-        );
-
+        $stmt = $conn->prepare("SELECT name FROM users WHERE name = ? LIMIT 1");
         $stmt->bind_param("s", $username);
         $stmt->execute();
 
         $result = $stmt->get_result();
 
-        if ($result->num_rows === 1) {
+        if ($result->num_rows > 0) {
 
-            $userData = $result->fetch_assoc();
-
-            $usernameVerified = true;
-
-            $_SESSION['adoption_user_id'] = $userData['id'];
-
-            $message = "Username verified successfully.";
-            $messageType = "success";
+            // Verified — remember it for the adoption step (kept in the
+            // session itself, not flash, so it survives future refreshes).
+            $_SESSION['adoption_user'] = $username;
         } else {
 
-            $message = "Username does not exist. Please create an account first.";
-            $messageType = "error";
+            $errors['username'] = "This user doesn't exist.";
         }
 
         $stmt->close();
     }
+
+    $_SESSION['flash'] = [
+        'errors'    => $errors,
+        'form_data' => ['username' => $username],
+    ];
+
+    header("Location: $self");
+    exit();
 }
 
+/*
+ * STEP 2: Handle the adoption form submission itself. Only allowed if
+ * a username has already been verified in this session.
+ */
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_adoption'])) {
 
-/* -----------------------------
-   SUBMIT ADOPTION APPLICATION
------------------------------- */
-if (isset($_POST['submit_application'])) {
+    $errors = [];
 
-    if (!isset($_SESSION['adoption_user_id'])) {
+    if (empty($_SESSION['adoption_user'])) {
 
-        $message = "Please verify your username first.";
-        $messageType = "error";
-    } else {
+        $errors['general'] = "Please verify your username before submitting the form.";
+        $_SESSION['flash'] = ['errors' => $errors, 'form_data' => []];
+        header("Location: $self");
+        exit();
+    }
 
-        $user_id = $_SESSION['adoption_user_id'];
+    $ownerName = $_SESSION['adoption_user'];
+    $dogName   = trim($_POST['dog_name'] ?? '');
+    $phone     = trim($_POST['phone'] ?? '');
+    $address   = trim($_POST['address'] ?? '');
+    $reason    = trim($_POST['reason'] ?? '');
 
-        $phone = trim($_POST['phone']);
-        $address = trim($_POST['address']);
-        $dog_id = intval($_POST['dog_id']);
-        $reason = trim($_POST['reason']);
+    if ($dogName === '') {
+        $errors['dog_name'] = "Please enter the dog's name.";
+    }
 
-        /* Get user information */
+    if ($phone === '') {
+        $errors['phone'] = "Phone number is required.";
+    }
+
+    if ($address === '') {
+        $errors['address'] = "Address is required.";
+    }
+
+    if (empty($errors)) {
+
         $stmt = $conn->prepare(
-            "SELECT id, name, email 
-             FROM user 
-             WHERE id = ? 
-             LIMIT 1"
+            "INSERT INTO adoption_applications
+                (owner_name, dog_name, phone, address, reason)
+             VALUES (?, ?, ?, ?, ?)"
         );
 
-        $stmt->bind_param("i", $user_id);
-        $stmt->execute();
+        $stmt->bind_param(
+            "sssss",
+            $ownerName,
+            $dogName,
+            $phone,
+            $address,
+            $reason
+        );
 
-        $userResult = $stmt->get_result();
+        if ($stmt->execute()) {
 
-        if ($userResult->num_rows !== 1) {
+            // Done with this session's verified user — a refresh after
+            // this point should land back on the plain verify screen,
+            // not resubmit or re-show the thank-you message forever.
+            unset($_SESSION['adoption_user']);
 
-            $message = "User account could not be found.";
-            $messageType = "error";
+            $_SESSION['flash'] = [
+                'success' => true,
+                'name'    => $ownerName,
+            ];
         } else {
 
-            $user = $userResult->fetch_assoc();
-
-            $fullname = $user['name'];
-            $email = $user['email'];
-
-            /* Check whether dog exists and is available */
-            $dogStmt = $conn->prepare(
-                "SELECT dog_id 
-                 FROM dogs 
-                 WHERE dog_id = ? 
-                 AND status = 'Available'
-                 LIMIT 1"
-            );
-
-            $dogStmt->bind_param("i", $dog_id);
-            $dogStmt->execute();
-
-            $dogResult = $dogStmt->get_result();
-
-            if ($dogResult->num_rows !== 1) {
-
-                $message = "This dog is no longer available.";
-                $messageType = "error";
-            } elseif ($phone === "" || $address === "" || $reason === "") {
-
-                $message = "Please fill in all required fields.";
-                $messageType = "error";
-            } else {
-
-                /* Check if user already has a pending application for this dog */
-                $checkStmt = $conn->prepare(
-                    "SELECT id 
-                     FROM adoption
-                     WHERE user_id = ?
-                     AND dog_id = ?
-                     AND status = 'Pending'
-                     LIMIT 1"
-                );
-
-                $checkStmt->bind_param("ii", $user_id, $dog_id);
-                $checkStmt->execute();
-
-                $existingResult = $checkStmt->get_result();
-
-                if ($existingResult->num_rows > 0) {
-
-                    $message = "You already have a pending application for this dog.";
-                    $messageType = "error";
-                } else {
-
-                    /* Insert application */
-                    $insertStmt = $conn->prepare(
-                        "INSERT INTO adoption
-                        (user_id, dog_id, fullname, email, phone, address, reason, status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')"
-                    );
-
-                    $insertStmt->bind_param(
-                        "iisssss",
-                        $user_id,
-                        $dog_id,
-                        $fullname,
-                        $email,
-                        $phone,
-                        $address,
-                        $reason
-                    );
-
-                    if ($insertStmt->execute()) {
-
-                        $message = "Your adoption application has been submitted successfully.";
-                        $messageType = "success";
-
-                        /* Remove verification after successful submission */
-                        unset($_SESSION['adoption_user_id']);
-                    } else {
-
-                        $message = "Something went wrong. Please try again.";
-                        $messageType = "error";
-                    }
-
-                    $insertStmt->close();
-                }
-
-                $checkStmt->close();
-            }
-
-            $dogStmt->close();
+            $errors['general'] = "Unable to submit application. Please try again.";
         }
 
         $stmt->close();
     }
-}
 
-
-/* -----------------------------
-   GET AVAILABLE DOGS
------------------------------- */
-$dogs = [];
-
-$dogQuery = $conn->query(
-    "SELECT dog_id, dog_breed, age, dog_image
-     FROM dogs
-     WHERE status = 'Available'
-     ORDER BY added_date DESC"
-);
-
-if ($dogQuery) {
-
-    while ($row = $dogQuery->fetch_assoc()) {
-        $dogs[] = $row;
+    if (!empty($errors)) {
+        $_SESSION['flash'] = [
+            'errors'    => $errors,
+            'form_data' => $_POST,
+        ];
     }
-}
-?>
 
+    header("Location: $self");
+    exit();
+}
+
+/*
+ * GET: read (and immediately clear) whatever the last POST left behind.
+ */
+$flash    = $_SESSION['flash'] ?? [];
+unset($_SESSION['flash']);
+
+$errors     = $flash['errors'] ?? [];
+$formData   = $flash['form_data'] ?? [];
+$adoptionSuccess = !empty($flash['success']);
+$successName     = $flash['name'] ?? '';
+
+$userVerified = !empty($_SESSION['adoption_user']);
+$verifiedName = $_SESSION['adoption_user'] ?? '';
+?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
-
-    <title>Adopt a Dog - Happy Tails</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/style.css">
+    <title>Dog Adoption</title>
 
+    <!--
+        Scoped styling for this page only. Every class below is prefixed
+        with "adopt-" so it can never collide with .login-* / .main-form-
+        container rules used elsewhere in assets/style.css (that's what
+        was causing the overlap with the site header).
+    -->
+    <style>
+        .adopt-page {
+            box-sizing: border-box;
+            min-height: calc(100vh - 90px);
+            /* leaves room for the fixed/sticky navbar above */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background: #ffffff;
+        }
 
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+        .adopt-panel {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            padding: 36px 32px;
+            box-sizing: border-box;
+            text-align: center;
+        }
 
+        .adopt-title {
+            margin: 0 0 8px;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+
+        .adopt-subtext {
+            display: block;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: #6b6b6b;
+        }
+
+        .adopt-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .adopt-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d9d9d9;
+            border-radius: 8px;
+            background: #f5f5f5;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+
+        .adopt-input:focus {
+            outline: none;
+            border-color: #5b7fdb;
+            background: #ffffff;
+        }
+
+        textarea.adopt-input {
+            min-height: 90px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .adopt-error {
+            display: block;
+            text-align: left;
+            color: #d64545;
+            font-size: 0.82rem;
+            margin-top: -6px;
+        }
+
+        .adopt-button {
+            margin-top: 8px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 24px;
+            background: #5b7fdb;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.9rem;
+            letter-spacing: 0.03em;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .adopt-button:hover {
+            background: #4a6bc4;
+        }
+
+        .adopt-button-secondary {
+            margin-top: 4px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 24px;
+            background: #eef1fb;
+            color: #33448e;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .adopt-button-secondary:hover {
+            background: #dde3f8;
+        }
+
+        .adopt-text {
+            margin: 12px 0 4px;
+            font-size: 0.88rem;
+            color: #4a4a4a;
+        }
+    </style>
 </head>
-<style>
-    /* Main container */
-
-    .adoption-container {
-        width: 90%;
-        max-width: 1000px;
-        margin: 50px auto;
-    }
-
-
-    /* Header */
-
-    .adoption-header {
-        text-align: center;
-        margin-bottom: 30px;
-    }
-
-    .paw-icon {
-        width: 55px;
-        height: 55px;
-
-        margin: 0 auto 12px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        background: #b5baff;
-        color: #4c3b8f;
-
-        border-radius: 50%;
-
-        font-size: 25px;
-    }
-
-    .adoption-header h1 {
-        color: #3d356b;
-        font-size: 32px;
-        margin-bottom: 8px;
-    }
-
-    .adoption-header p {
-        color: #666;
-        font-size: 16px;
-    }
-
-
-    /* Messages */
-
-    .message {
-        padding: 14px 18px;
-
-        border-radius: 10px;
-
-        margin-bottom: 20px;
-
-        font-weight: 600;
-    }
-
-    .message.success {
-        background: #e6f7ed;
-        color: #237a45;
-        border: 1px solid #b8e5ca;
-    }
-
-    .message.error {
-        background: #fff0f0;
-        color: #b33434;
-        border: 1px solid #f0bcbc;
-    }
-
-
-    /* Username verification */
-
-    .username-section,
-    .adoption-form {
-        background: white;
-
-        padding: 35px;
-
-        border-radius: 20px;
-
-        box-shadow: 0 8px 25px rgba(60, 50, 100, 0.10);
-
-        border: 1px solid #e3e0ef;
-    }
-
-    .username-section {
-        max-width: 600px;
-        margin: 0 auto;
-    }
-
-    .username-section h2,
-    .adoption-form h2 {
-        color: #4b3b83;
-
-        margin-bottom: 10px;
-
-        font-size: 23px;
-    }
-
-    .username-section h2 i,
-    .adoption-form h2 i {
-        color: #5a34ae;
-        margin-right: 8px;
-    }
-
-    .username-section p {
-        color: #777;
-        margin-bottom: 25px;
-        line-height: 1.6;
-    }
-
-
-    /* Form */
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-group label {
-        display: block;
-
-        margin-bottom: 8px;
-
-        color: #3c3659;
-
-        font-weight: 600;
-    }
-
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        width: 100%;
-
-        padding: 13px 15px;
-
-        border: 1px solid #d8d5e5;
-
-        border-radius: 10px;
-
-        outline: none;
-
-        font-size: 15px;
-
-        font-family: Arial, sans-serif;
-
-        background: #faf9fd;
-
-        transition: 0.2s;
-    }
-
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
-        border-color: #8c7bd9;
-
-        box-shadow: 0 0 0 3px rgba(181, 186, 255, 0.35);
-
-        background: white;
-    }
-
-    .form-group input[readonly] {
-        background: #eeeef5;
-        color: #555;
-        cursor: not-allowed;
-    }
-
-    .form-group textarea {
-        resize: vertical;
-    }
-
-
-    /* Two columns */
-
-    .form-row {
-        display: grid;
-
-        grid-template-columns: 1fr 1fr;
-
-        gap: 20px;
-    }
-
-
-    /* Verify button */
-
-    .verify-btn,
-    .submit-btn {
-        border: none;
-
-        background: #b5baff;
-
-        color: #27213e;
-
-        font-weight: 700;
-
-        font-size: 15px;
-
-        padding: 13px 22px;
-
-        border-radius: 10px;
-
-        cursor: pointer;
-
-        transition: 0.3s;
-    }
-
-    .verify-btn:hover,
-    .submit-btn:hover {
-        background: #9da4f5;
-
-        transform: translateY(-1px);
-    }
-
-    .verify-btn i,
-    .submit-btn i {
-        margin-right: 7px;
-    }
-
-
-    /* Verified user */
-
-    .verified-user {
-        display: flex;
-
-        align-items: center;
-
-        gap: 15px;
-
-        padding: 18px 20px;
-
-        background: #eeedff;
-
-        border: 1px solid #d5d0f3;
-
-        border-radius: 15px;
-
-        margin-bottom: 20px;
-    }
-
-    .verified-icon {
-        font-size: 28px;
-
-        color: #5a34ae;
-    }
-
-    .verified-user strong {
-        color: #40346d;
-
-        font-size: 17px;
-    }
-
-    .verified-user p {
-        color: #666;
-
-        margin-top: 4px;
-    }
-
-
-    /* Adoption form */
-
-    .adoption-form h2 {
-        margin-bottom: 28px;
-
-        padding-bottom: 15px;
-
-        border-bottom: 1px solid #e5e2ed;
-    }
-
-    .submit-btn {
-        width: 100%;
-
-        padding: 15px;
-
-        margin-top: 5px;
-
-        background: #b5baff;
-
-        font-size: 16px;
-    }
-
-
-    /* Mobile */
-
-    @media (max-width: 700px) {
-
-        .adoption-container {
-            width: 94%;
-
-            margin: 30px auto;
-        }
-
-        .adoption-header h1 {
-            font-size: 25px;
-        }
-
-        .username-section,
-        .adoption-form {
-            padding: 22px;
-        }
-
-        .form-row {
-            grid-template-columns: 1fr;
-
-            gap: 0;
-        }
-    }
-</style>
 
 <body>
+    <section class="adopt-page">
 
-    <div class="adoption-container">
+        <?php if ($adoptionSuccess): ?>
 
-        <div class="adoption-header">
-
-            <div class="paw-icon">
-                <i class="fa-solid fa-paw"></i>
-            </div>
-
-            <h1>Give a Dog a Forever Home</h1>
-
-            <p>
-                Start your adoption journey with Happy Tails.
-            </p>
-
-        </div>
-
-
-        <?php if ($message !== ""): ?>
-
-            <div class="message <?php echo $messageType; ?>">
-
-                <?php echo htmlspecialchars($message); ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- USERNAME VERIFICATION -->
-
-        <?php if (!$usernameVerified && !isset($_SESSION['adoption_user_id'])): ?>
-
-            <div class="username-section">
-
-                <h2>
-                    <i class="fa-solid fa-user-check"></i>
-                    Verify Your Username
-                </h2>
-
-                <p>
-                    Please enter your registered username before
-                    filling out the adoption application.
+            <!-- SUCCESS MESSAGE (shown once, right after submission) -->
+            <div class="adopt-panel">
+                <h1 class="adopt-title">Application Submitted!</h1>
+                <p class="adopt-text">
+                    Thank you, <?php echo htmlspecialchars($successName); ?>.
+                    Your adoption application has been received.
                 </p>
+            </div>
 
-                <form method="POST">
+        <?php elseif ($userVerified): ?>
 
-                    <div class="form-group">
+            <!-- ADOPTION FORM (shown only after username is verified) -->
+            <div class="adopt-panel">
+                <form class="adopt-form" action="" method="POST">
 
-                        <label for="username">
-                            Username
-                        </label>
+                    <h1 class="adopt-title">Dog Adoption Application</h1>
+                    <span class="adopt-subtext">
+                        Welcome, <?php echo htmlspecialchars($verifiedName); ?>!
+                    </span>
 
-                        <input
-                            type="text"
-                            id="username"
-                            name="username"
-                            placeholder="Enter your username"
-                            required>
+                    <?php if (!empty($errors['general'])): ?>
+                        <span class="adopt-error">
+                            <?php echo htmlspecialchars($errors['general']); ?>
+                        </span>
+                    <?php endif; ?>
 
-                    </div>
+                    <input type="text"
+                        name="dog_name"
+                        class="adopt-input"
+                        placeholder="Dog's Name"
+                        value="<?php echo htmlspecialchars($formData['dog_name'] ?? ''); ?>">
 
-                    <button
-                        type="submit"
-                        name="check_username"
-                        class="verify-btn">
+                    <?php if (!empty($errors['dog_name'])): ?>
+                        <span class="adopt-error">
+                            <?php echo htmlspecialchars($errors['dog_name']); ?>
+                        </span>
+                    <?php endif; ?>
 
-                        <i class="fa-solid fa-check"></i>
-                        Check Username
+                    <input type="text"
+                        name="phone"
+                        class="adopt-input"
+                        placeholder="Phone Number"
+                        value="<?php echo htmlspecialchars($formData['phone'] ?? ''); ?>">
 
+                    <?php if (!empty($errors['phone'])): ?>
+                        <span class="adopt-error">
+                            <?php echo htmlspecialchars($errors['phone']); ?>
+                        </span>
+                    <?php endif; ?>
+
+                    <input type="text"
+                        name="address"
+                        class="adopt-input"
+                        placeholder="Address"
+                        value="<?php echo htmlspecialchars($formData['address'] ?? ''); ?>">
+
+                    <?php if (!empty($errors['address'])): ?>
+                        <span class="adopt-error">
+                            <?php echo htmlspecialchars($errors['address']); ?>
+                        </span>
+                    <?php endif; ?>
+
+                    <textarea name="reason"
+                        class="adopt-input"
+                        placeholder="Why do you want to adopt this dog?"><?php echo htmlspecialchars($formData['reason'] ?? ''); ?></textarea>
+
+                    <button type="submit" name="submit_adoption" class="adopt-button">
+                        Submit Application
                     </button>
 
                 </form>
-
             </div>
 
         <?php else: ?>
 
-
-            <?php
-
-            /* Get user if session exists */
-            if (!$userData && isset($_SESSION['adoption_user_id'])) {
-
-                $sessionUserId = $_SESSION['adoption_user_id'];
-
-                $stmt = $conn->prepare(
-                    "SELECT id, name, email
-                 FROM user
-                 WHERE id = ?
-                 LIMIT 1"
-                );
-
-                $stmt->bind_param("i", $sessionUserId);
-                $stmt->execute();
-
-                $result = $stmt->get_result();
-
-                if ($result->num_rows === 1) {
-                    $userData = $result->fetch_assoc();
-                }
-
-                $stmt->close();
-            }
-
-            ?>
-
-
-            <!-- USER INFORMATION -->
-
-            <?php if ($userData): ?>
-
-                <div class="verified-user">
-
-                    <div class="verified-icon">
-                        <i class="fa-solid fa-circle-check"></i>
-                    </div>
-
-                    <div>
-
-                        <strong>
-                            Username Verified
-                        </strong>
-
-                        <p>
-                            Welcome,
-                            <?php echo htmlspecialchars($userData['name']); ?>
-                        </p>
-
-                    </div>
-
-                </div>
-
-
-                <!-- ADOPTION FORM -->
-
-                <form method="POST"
-                    class="adoption-form">
-
-                    <h2>
-                        <i class="fa-solid fa-heart"></i>
-                        Adoption Application
-                    </h2>
-
-
-                    <div class="form-row">
-
-                        <div class="form-group">
-
-                            <label>
-                                Full Name
-                            </label>
-
-                            <input
-                                type="text"
-                                value="<?php echo htmlspecialchars($userData['name']); ?>"
-                                readonly>
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Email
-                            </label>
-
-                            <input
-                                type="email"
-                                value="<?php echo htmlspecialchars($userData['email']); ?>"
-                                readonly>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-row">
-
-                        <div class="form-group">
-
-                            <label for="phone">
-                                Phone Number
-                            </label>
-
-                            <input
-                                type="tel"
-                                id="phone"
-                                name="phone"
-                                placeholder="Enter your phone number"
-                                required>
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label for="dog_id">
-                                Select Dog
-                            </label>
-
-                            <select
-                                name="dog_id"
-                                id="dog_id"
-                                required>
-
-                                <option value="">
-                                    -- Select a Dog --
-                                </option>
-
-                                <?php foreach ($dogs as $dog): ?>
-
-                                    <option value="<?php echo $dog['dog_id']; ?>">
-
-                                        <?php
-                                        echo htmlspecialchars($dog['dog_breed']);
-                                        ?>
-
-                                        -
-                                        <?php
-                                        echo htmlspecialchars($dog['age']);
-                                        ?>
-
-                                    </option>
-
-                                <?php endforeach; ?>
-
-                            </select>
-
-                        </div>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label for="address">
-                            Address
-                        </label>
-
-                        <textarea
-                            id="address"
-                            name="address"
-                            rows="3"
-                            placeholder="Enter your full address"
-                            required></textarea>
-
-                    </div>
-
-
-                    <div class="form-group">
-
-                        <label for="reason">
-                            Why do you want to adopt this dog?
-                        </label>
-
-                        <textarea
-                            id="reason"
-                            name="reason"
-                            rows="5"
-                            placeholder="Tell us why you would like to adopt this dog..."
-                            required></textarea>
-
-                    </div>
-
-
-                    <button
-                        type="submit"
-                        name="submit_application"
-                        class="submit-btn">
-
-                        <i class="fa-solid fa-paw"></i>
-                        Submit Adoption Application
-
+            <!-- USERNAME CHECK FORM (default view) -->
+            <div class="adopt-panel">
+                <form class="adopt-form" action="" method="POST">
+
+                    <h1 class="adopt-title">Verify Your Account</h1>
+                    <span class="adopt-subtext">
+                        Enter your registered username to continue to the adoption form
+                    </span>
+
+                    <input type="text"
+                        name="username"
+                        class="adopt-input"
+                        placeholder="Username"
+                        autocomplete="username"
+                        value="<?php echo htmlspecialchars($formData['username'] ?? ''); ?>">
+
+                    <?php if (!empty($errors['username'])): ?>
+                        <span class="adopt-error">
+                            <?php echo htmlspecialchars($errors['username']); ?>
+                        </span>
+                    <?php endif; ?>
+
+                    <button type="submit" name="check_user" class="adopt-button">
+                        Check
                     </button>
 
-                </form>
+                    <?php if (!empty($errors['username']) && $errors['username'] === "This user doesn't exist."): ?>
+                        <p class="adopt-text">Not registered yet?</p>
+                        <a href="index.php" style="text-decoration:none; display:block;">
+                            <button type="button" class="adopt-button-secondary">
+                                Go to Sign Up
+                            </button>
+                        </a>
+                    <?php endif; ?>
 
-            <?php endif; ?>
+                </form>
+            </div>
 
         <?php endif; ?>
 
-    </div>
-
+    </section>
 </body>
 
 </html>
