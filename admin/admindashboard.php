@@ -8,6 +8,21 @@ ini_set('display_errors', 1);
 
 /*
 |--------------------------------------------------------------------------
+| ADMIN LOGIN CHECK
+|--------------------------------------------------------------------------
+*/
+
+if (
+  !isset($_SESSION['admin_logged_in']) ||
+  $_SESSION['admin_logged_in'] !== true
+) {
+  header("Location: admin-login.php");
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | PHPMailer
 |--------------------------------------------------------------------------
 */
@@ -31,12 +46,109 @@ require_once __DIR__ . '/dataconnection.php';
 
 /*
 |--------------------------------------------------------------------------
+| HELPER
+|--------------------------------------------------------------------------
+*/
+
+function e($value)
+{
+  return htmlspecialchars(
+    (string)($value ?? ''),
+    ENT_QUOTES,
+    'UTF-8'
+  );
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| IMAGE DIRECTORY
+|--------------------------------------------------------------------------
+*/
+
+$imageDirectory = __DIR__ . '/../assets/images/';
+
+$imageExtensions = [
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'jfif'
+];
+
+$availableImages = [];
+
+if (is_dir($imageDirectory)) {
+
+  $files = scandir($imageDirectory);
+
+  foreach ($files as $file) {
+
+    if ($file === '.' || $file === '..') {
+      continue;
+    }
+
+    $extension = strtolower(
+      pathinfo($file, PATHINFO_EXTENSION)
+    );
+
+    if (in_array($extension, $imageExtensions, true)) {
+      $availableImages[] = $file;
+    }
+  }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| IMAGE URL
+|--------------------------------------------------------------------------
+*/
+
+function getImageUrl($image)
+{
+  $image = trim((string)$image);
+
+  if ($image === '') {
+    return 'assets/images/default-dog.jpg';
+  }
+
+  /*
+    | If database already contains full relative path
+    */
+  if (
+    strpos($image, 'assets/images/') === 0 ||
+    strpos($image, 'dogpic/') === 0
+  ) {
+    return '../' . $image;
+  }
+
+  /*
+    | Otherwise image is stored as filename
+    */
+  return '../assets/images/' . rawurlencode($image);
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE IMAGE PATH
+|--------------------------------------------------------------------------
+*/
+
+function getDatabaseImagePath($filename)
+{
+  $filename = basename((string)$filename);
+
+  return 'assets/images/' . $filename;
+}
+
+
+/*
+|--------------------------------------------------------------------------
 | UNREAD CHAT COUNT
 |--------------------------------------------------------------------------
-|
-| Only messages sent by users are counted.
-| Admin messages are never counted as notifications.
-|
 */
 
 $unreadChatCount = 0;
@@ -50,11 +162,9 @@ $unreadChatResult = $conn->query("
 
 if ($unreadChatResult) {
 
-  $unreadChatRow =
-    $unreadChatResult->fetch_assoc();
+  $unreadRow = $unreadChatResult->fetch_assoc();
 
-  $unreadChatCount =
-    (int)($unreadChatRow['total'] ?? 0);
+  $unreadChatCount = (int)($unreadRow['total'] ?? 0);
 }
 
 
@@ -62,19 +172,30 @@ if ($unreadChatResult) {
 |--------------------------------------------------------------------------
 | EMAIL CONFIGURATION
 |--------------------------------------------------------------------------
+|
+| Use the SAME working Gmail credentials that you used
+| for your submission email.
+|
 */
 
-$mailUsername = "YOUR_GMAIL@gmail.com";
-$mailPassword = "YOUR_16_CHARACTER_APP_PASSWORD";
+$mailUsername = "happytailsnepal@gmail.com";
+
+$mailPassword = "avovnrqcuhnkcvkd";
+
 $mailFromName = "Happy Tails";
 
 $shelterLocation =
   "Happy Tails Shelter, Kathmandu — Mon to Sat, 10am to 5pm";
 
+/*
+| Put your real shelter/contact number here.
+*/
+$shelterPhone = "+977-98XXXXXXXX";
+
 
 /*
 |--------------------------------------------------------------------------
-| SEND APPLICATION EMAIL
+| SEND APPLICATION STATUS EMAIL
 |--------------------------------------------------------------------------
 */
 
@@ -90,13 +211,34 @@ function sendApplicationEmail(
     $mailUsername,
     $mailPassword,
     $mailFromName,
-    $shelterLocation;
+    $shelterLocation,
+    $shelterPhone;
 
 
+  /*
+    | Validate applicant email
+    */
   if (
     empty($toEmail) ||
     !filter_var($toEmail, FILTER_VALIDATE_EMAIL)
   ) {
+
+    error_log(
+      "Invalid applicant email: " . $toEmail
+    );
+
+    return false;
+  }
+
+
+  /*
+    | Check Gmail password
+    */
+  if (empty($mailPassword)) {
+
+    error_log(
+      "Gmail App Password is not configured."
+    );
 
     return false;
   }
@@ -108,9 +250,7 @@ function sendApplicationEmail(
 
 
     /*
-        |--------------------------------------------------------------------------
         | SMTP SETTINGS
-        |--------------------------------------------------------------------------
         */
 
     $mail->isSMTP();
@@ -130,9 +270,7 @@ function sendApplicationEmail(
 
 
     /*
-        |--------------------------------------------------------------------------
-        | FROM / TO
-        |--------------------------------------------------------------------------
+        | FROM
         */
 
     $mail->setFrom(
@@ -140,10 +278,20 @@ function sendApplicationEmail(
       $mailFromName
     );
 
+
+    /*
+        | TO
+        */
+
     $mail->addAddress(
       $toEmail,
       $applicantName
     );
+
+
+    /*
+        | HTML EMAIL
+        */
 
     $mail->isHTML(true);
 
@@ -160,70 +308,135 @@ function sendApplicationEmail(
         "Your Dog Adoption Application Has Been Accepted!";
 
 
+      $safeApplicantName =
+        e($applicantName);
+
+      $safeDogBreed =
+        e($dogBreed);
+
+      $safePhone =
+        e($shelterPhone);
+
+      $safeLocation =
+        e($shelterLocation);
+
+
       $mail->Body = "
 
-                <div style=\"
+                <div style='
                     font-family: Arial, sans-serif;
-                    max-width: 600px;
+                    max-width: 650px;
                     margin: auto;
-                    line-height: 1.6;
-                    color: #333;
-                \">
+                    padding: 25px;
+                    border: 1px solid #ddd;
+                    border-radius: 12px;
+                    background: #ffffff;
+                '>
 
-                    <h2 style=\"color:#5a34ae;\">
-                        Application Accepted
+                    <h2 style='
+                        color: #5a34ae;
+                    '>
+                        Happy Tails Shelter
                     </h2>
 
                     <p>
-                        Hi
-                        <strong>" .
-        htmlspecialchars($applicantName) .
-        "</strong>,
+                        Dear <strong>
+                            {$safeApplicantName}
+                        </strong>,
                     </p>
 
                     <p>
-                        Great news! Your application to adopt
-                        <strong>" .
-        htmlspecialchars($dogBreed) .
-        "</strong>
+                        Great news! 🎉
+                    </p>
+
+                    <p>
+                        Your application to adopt
+                        <strong>
+                            {$safeDogBreed}
+                        </strong>
                         has been
-                        <strong>accepted</strong>.
+                        <strong style='color: green;'>
+                            accepted
+                        </strong>.
                     </p>
 
                     <p>
-                        Please visit us at:
-                    </p>
-
-                    <p>
-                        <strong>" .
-        htmlspecialchars($shelterLocation) .
-        "</strong>
-                    </p>
-
-                    <p>
-                        We will guide you through the remaining
+                        Please contact us at the number below
+                        or visit our shelter for the further
                         adoption process.
                     </p>
 
+                    <div style='
+                        background: #f3f0fa;
+                        padding: 18px;
+                        border-radius: 10px;
+                        margin: 20px 0;
+                    '>
+
+                        <p>
+                            <strong>
+                                Contact Number:
+                            </strong>
+                            {$safePhone}
+                        </p>
+
+                        <p>
+                            <strong>
+                                Shelter Location:
+                            </strong>
+                            {$safeLocation}
+                        </p>
+
+                    </div>
+
                     <p>
-                        Thank you for choosing Happy Tails.
+                        Please contact us or visit the shelter
+                        during the available hours so that we
+                        can proceed with the remaining adoption
+                        formalities.
                     </p>
 
                     <p>
+                        Thank you for choosing to adopt and
+                        giving a dog a loving home. ❤️
+                    </p>
+
+                    <br>
+
+                    <p>
                         Regards,<br>
-                        <strong>Happy Tails</strong>
+                        <strong>
+                            Happy Tails Shelter
+                        </strong>
                     </p>
 
                 </div>
             ";
 
 
+      /*
+            | Plain text version
+            */
+
       $mail->AltBody =
-        "Hi {$applicantName},\n\n" .
-        "Your application to adopt {$dogBreed} has been accepted.\n\n" .
-        "Please visit us at {$shelterLocation} to complete the adoption process.\n\n" .
-        "Thank you for choosing Happy Tails.\n\n" .
-        "Regards,\nHappy Tails";
+        "Dear {$applicantName},\n\n" .
+
+        "Great news! Your application to adopt " .
+        "{$dogBreed} has been accepted.\n\n" .
+
+        "Please contact us at {$shelterPhone} " .
+        "or visit our shelter for the further " .
+        "adoption process.\n\n" .
+
+        "Contact Number: {$shelterPhone}\n" .
+
+        "Shelter Location: {$shelterLocation}\n\n" .
+
+        "Thank you for choosing to adopt and " .
+        "giving a dog a loving home.\n\n" .
+
+        "Regards,\n" .
+        "Happy Tails Shelter";
     }
 
 
@@ -237,6 +450,17 @@ function sendApplicationEmail(
         "Update on Your Dog Adoption Application";
 
 
+      $safeApplicantName =
+        e($applicantName);
+
+      $safeDogBreed =
+        e($dogBreed);
+
+      /*
+            | IMPORTANT:
+            | This is the EXACT reason entered by admin.
+            */
+
       $safeReason =
         htmlspecialchars(
           $reason,
@@ -247,78 +471,110 @@ function sendApplicationEmail(
 
       $mail->Body = "
 
-                <div style=\"
+                <div style='
                     font-family: Arial, sans-serif;
-                    max-width: 600px;
+                    max-width: 650px;
                     margin: auto;
-                    line-height: 1.6;
-                    color: #333;
-                \">
+                    padding: 25px;
+                    border: 1px solid #ddd;
+                    border-radius: 12px;
+                    background: #ffffff;
+                '>
 
-                    <h2 style=\"color:#d64545;\">
-                        Application Status Update
+                    <h2 style='
+                        color: #5a34ae;
+                    '>
+                        Happy Tails Shelter
                     </h2>
 
                     <p>
-                        Hi
-                        <strong>" .
-        htmlspecialchars($applicantName) .
-        "</strong>,
+                        Dear <strong>
+                            {$safeApplicantName}
+                        </strong>,
                     </p>
 
                     <p>
-                        Your application to adopt
-                        <strong>" .
-        htmlspecialchars($dogBreed) .
-        "</strong>
-                        has been
-                        <strong>declined</strong>.
+                        Thank you for submitting your adoption
+                        application for
+                        <strong>
+                            {$safeDogBreed}
+                        </strong>.
                     </p>
 
-                    <div style=\"
-                        margin: 20px 0;
-                        padding: 15px;
-                        background: #f8f8f8;
-                        border-left: 4px solid #d64545;
-                    \">
-
-                        <strong>
-                            Reason:
+                    <p>
+                        After reviewing your application,
+                        we regret to inform you that your
+                        application has been
+                        <strong style='color: #c0392b;'>
+                            declined
                         </strong>
+                        at this time.
+                    </p>
 
-                        <p style=\"margin:8px 0 0;\">
-                            " .
-        nl2br($safeReason) .
-        "
+                    <div style='
+                        background: #fff3f3;
+                        border-left: 5px solid #c0392b;
+                        padding: 15px;
+                        margin: 20px 0;
+                    '>
+
+                        <p>
+                            <strong>
+                                Reason for Decline:
+                            </strong>
+                        </p>
+
+                        <p>
+                            " . nl2br($safeReason) . "
                         </p>
 
                     </div>
 
                     <p>
-                        Thank you for your interest in adopting
-                        with Happy Tails.
+                        We appreciate your interest in giving
+                        a dog a loving home.
                     </p>
 
                     <p>
-                        You may apply for another available dog
-                        in the future.
+                        You may consider applying for another
+                        available dog in the future.
                     </p>
+
+                    <br>
 
                     <p>
                         Regards,<br>
-                        <strong>Happy Tails</strong>
+                        <strong>
+                            Happy Tails Shelter
+                        </strong>
                     </p>
 
                 </div>
             ";
 
 
+      /*
+            | Plain text version
+            */
+
       $mail->AltBody =
-        "Hi {$applicantName},\n\n" .
-        "Your application to adopt {$dogBreed} has been declined.\n\n" .
-        "Reason: {$reason}\n\n" .
-        "Thank you for your interest in adopting with Happy Tails.\n\n" .
-        "Regards,\nHappy Tails";
+        "Dear {$applicantName},\n\n" .
+
+        "Thank you for submitting your adoption " .
+        "application for {$dogBreed}.\n\n" .
+
+        "After reviewing your application, we regret " .
+        "to inform you that your application has been " .
+        "declined at this time.\n\n" .
+
+        "Reason for Decline:\n" .
+        "{$reason}\n\n" .
+
+        "We appreciate your interest in giving a dog " .
+        "a loving home.\n\n" .
+
+        "Regards,\n" .
+        "Happy Tails Shelter";
     }
 
 
@@ -345,282 +601,6 @@ function sendApplicationEmail(
 
 /*
 |--------------------------------------------------------------------------
-| DELETE DOG
-|--------------------------------------------------------------------------
-*/
-
-if (
-  $_SERVER['REQUEST_METHOD'] === 'POST' &&
-  isset($_POST['delete_dog'])
-) {
-
-  $dogId =
-    (int)($_POST['dog_id'] ?? 0);
-
-
-  if ($dogId > 0) {
-
-    $stmt = $conn->prepare(
-      "SELECT dog_image
-             FROM dogs
-             WHERE dog_id = ?"
-    );
-
-    $stmt->bind_param(
-      "i",
-      $dogId
-    );
-
-    $stmt->execute();
-
-    $dog =
-      $stmt->get_result()->fetch_assoc();
-
-    $stmt->close();
-
-
-    if ($dog) {
-
-      $deleteStmt = $conn->prepare(
-        "DELETE FROM dogs
-                 WHERE dog_id = ?"
-      );
-
-      $deleteStmt->bind_param(
-        "i",
-        $dogId
-      );
-
-      $deleteStmt->execute();
-
-      $deleteStmt->close();
-
-
-      if (!empty($dog['dog_image'])) {
-
-        $imageFile =
-          __DIR__ .
-          '/../' .
-          ltrim(
-            $dog['dog_image'],
-            '/'
-          );
-
-        if (file_exists($imageFile)) {
-
-          @unlink($imageFile);
-        }
-      }
-    }
-  }
-
-
-  header(
-    "Location: admindashboard.php"
-  );
-
-  exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| UPDATE DOG
-|--------------------------------------------------------------------------
-*/
-
-if (
-  $_SERVER['REQUEST_METHOD'] === 'POST' &&
-  isset($_POST['update_dog'])
-) {
-
-  $dogId =
-    (int)($_POST['dog_id'] ?? 0);
-
-  $breed =
-    trim($_POST['breed'] ?? '');
-
-  $age =
-    trim($_POST['age'] ?? '');
-
-  $description =
-    trim($_POST['description'] ?? '');
-
-
-  if (
-    $dogId > 0 &&
-    $breed !== '' &&
-    $age !== ''
-  ) {
-
-    $stmt = $conn->prepare(
-      "SELECT dog_image
-             FROM dogs
-             WHERE dog_id = ?"
-    );
-
-    $stmt->bind_param(
-      "i",
-      $dogId
-    );
-
-    $stmt->execute();
-
-    $oldDog =
-      $stmt->get_result()->fetch_assoc();
-
-    $stmt->close();
-
-
-    $oldImage =
-      $oldDog['dog_image'] ?? '';
-
-    $newImage =
-      $oldImage;
-
-
-    if (
-      isset($_FILES['dog_image']) &&
-      $_FILES['dog_image']['error'] === UPLOAD_ERR_OK
-    ) {
-
-      $originalName =
-        $_FILES['dog_image']['name'];
-
-      $tmpName =
-        $_FILES['dog_image']['tmp_name'];
-
-      $extension =
-        strtolower(
-          pathinfo(
-            $originalName,
-            PATHINFO_EXTENSION
-          )
-        );
-
-
-      $allowedExtensions = [
-        'jpg',
-        'jpeg',
-        'png',
-        'gif',
-        'webp',
-        'jfif'
-      ];
-
-
-      if (
-        in_array(
-          $extension,
-          $allowedExtensions,
-          true
-        )
-      ) {
-
-        $uploadDir =
-          __DIR__ .
-          '/../dogpic/';
-
-
-        if (!is_dir($uploadDir)) {
-
-          mkdir(
-            $uploadDir,
-            0777,
-            true
-          );
-        }
-
-
-        $newFileName =
-          uniqid(
-            'dog_',
-            true
-          ) .
-          '.' .
-          $extension;
-
-
-        $destination =
-          $uploadDir .
-          $newFileName;
-
-
-        if (
-          move_uploaded_file(
-            $tmpName,
-            $destination
-          )
-        ) {
-
-          $newImage =
-            'dogpic/' .
-            $newFileName;
-
-
-          if (!empty($oldImage)) {
-
-            $oldImageFile =
-              __DIR__ .
-              '/../' .
-              ltrim(
-                $oldImage,
-                '/'
-              );
-
-            if (
-              file_exists(
-                $oldImageFile
-              )
-            ) {
-
-              @unlink(
-                $oldImageFile
-              );
-            }
-          }
-        }
-      }
-    }
-
-
-    $updateStmt = $conn->prepare(
-      "UPDATE dogs
-             SET
-                dog_breed = ?,
-                age = ?,
-                description = ?,
-                dog_image = ?
-             WHERE dog_id = ?"
-    );
-
-
-    $updateStmt->bind_param(
-      "sissi",
-      $breed,
-      $age,
-      $description,
-      $newImage,
-      $dogId
-    );
-
-
-    $updateStmt->execute();
-
-    $updateStmt->close();
-  }
-
-
-  header(
-    "Location: admindashboard.php"
-  );
-
-  exit;
-}
-
-
-/*
-|--------------------------------------------------------------------------
 | ACCEPT APPLICATION
 |--------------------------------------------------------------------------
 */
@@ -631,12 +611,15 @@ if (
 ) {
 
   $applicationId =
-    (int)(
-      $_POST['application_id'] ?? 0
-    );
+    (int)($_POST['application_id'] ?? 0);
 
 
   if ($applicationId > 0) {
+
+    /*
+        | Get applicant information
+        | Email comes from users table.
+        */
 
     $stmt = $conn->prepare("
             SELECT
@@ -651,28 +634,31 @@ if (
         ");
 
 
-    $stmt->bind_param(
-      "i",
-      $applicationId
-    );
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "i",
+        $applicationId
+      );
+
+      $stmt->execute();
+
+      $result =
+        $stmt->get_result();
+
+      $app =
+        $result->fetch_assoc();
+
+      $stmt->close();
 
 
-    $stmt->execute();
+      if ($app) {
 
+        /*
+                | Update status
+                */
 
-    $app =
-      $stmt
-      ->get_result()
-      ->fetch_assoc();
-
-
-    $stmt->close();
-
-
-    if ($app) {
-
-      $updateStmt =
-        $conn->prepare("
+        $updateStmt = $conn->prepare("
                     UPDATE adoption_applications
                     SET
                         status = 'accepted',
@@ -681,29 +667,45 @@ if (
                 ");
 
 
-      $updateStmt->bind_param(
-        "i",
-        $applicationId
-      );
+        if ($updateStmt) {
+
+          $updateStmt->bind_param(
+            "i",
+            $applicationId
+          );
+
+          $updateStmt->execute();
+
+          $updateStmt->close();
+        }
 
 
-      $updateStmt->execute();
+        /*
+                | Send accepted email
+                */
 
-      $updateStmt->close();
+        sendApplicationEmail(
 
+          $app['email'] ?? '',
 
-      sendApplicationEmail(
-        $app['email'],
-        $app['owner_name'],
-        $app['dog_breed'],
-        'accepted'
-      );
+          $app['owner_name'] ?? '',
+
+          $app['dog_breed'] ?? '',
+
+          'accepted'
+
+        );
+      }
     }
   }
 
 
+  /*
+    | Return to applications section
+    */
+
   header(
-    "Location: admindashboard.php"
+    "Location: admindashboard.php#applications"
   );
 
   exit;
@@ -722,9 +724,7 @@ if (
 ) {
 
   $applicationId =
-    (int)(
-      $_POST['application_id'] ?? 0
-    );
+    (int)($_POST['application_id'] ?? 0);
 
   $declineReason =
     trim(
@@ -736,6 +736,10 @@ if (
     $applicationId > 0 &&
     $declineReason !== ''
   ) {
+
+    /*
+        | Get applicant information
+        */
 
     $stmt = $conn->prepare("
             SELECT
@@ -750,28 +754,31 @@ if (
         ");
 
 
-    $stmt->bind_param(
-      "i",
-      $applicationId
-    );
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "i",
+        $applicationId
+      );
+
+      $stmt->execute();
+
+      $result =
+        $stmt->get_result();
+
+      $app =
+        $result->fetch_assoc();
+
+      $stmt->close();
 
 
-    $stmt->execute();
+      if ($app) {
 
+        /*
+                | Save exact admin reason
+                */
 
-    $app =
-      $stmt
-      ->get_result()
-      ->fetch_assoc();
-
-
-    $stmt->close();
-
-
-    if ($app) {
-
-      $updateStmt =
-        $conn->prepare("
+        $updateStmt = $conn->prepare("
                     UPDATE adoption_applications
                     SET
                         status = 'declined',
@@ -780,31 +787,51 @@ if (
                 ");
 
 
-      $updateStmt->bind_param(
-        "si",
-        $declineReason,
-        $applicationId
-      );
+        if ($updateStmt) {
+
+          $updateStmt->bind_param(
+            "si",
+            $declineReason,
+            $applicationId
+          );
+
+          $updateStmt->execute();
+
+          $updateStmt->close();
+        }
 
 
-      $updateStmt->execute();
+        /*
+                | Send declined email
+                |
+                | The exact reason entered by admin
+                | is passed to the email function.
+                */
 
-      $updateStmt->close();
+        sendApplicationEmail(
 
+          $app['email'] ?? '',
 
-      sendApplicationEmail(
-        $app['email'],
-        $app['owner_name'],
-        $app['dog_breed'],
-        'declined',
-        $declineReason
-      );
+          $app['owner_name'] ?? '',
+
+          $app['dog_breed'] ?? '',
+
+          'declined',
+
+          $declineReason
+
+        );
+      }
     }
   }
 
 
+  /*
+    | Return to applications
+    */
+
   header(
-    "Location: admindashboard.php"
+    "Location: admindashboard.php#applications"
   );
 
   exit;
@@ -813,88 +840,114 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| LOAD COUNTS
+| DASHBOARD COUNTS
 |--------------------------------------------------------------------------
 */
 
-$pendingCount = 0;
-$acceptedCount = 0;
-$declinedCount = 0;
 $totalDogs = 0;
+$pendingApplications = 0;
+$acceptedApplications = 0;
+$declinedApplications = 0;
 
 
-$countResult =
-  $conn->query("
-        SELECT
-            COUNT(*) AS total,
-            SUM(status = 'pending') AS pending,
-            SUM(status = 'accepted') AS accepted,
-            SUM(status = 'declined') AS declined
-        FROM adoption_applications
-    ");
+/*
+| Total dogs
+*/
 
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM dogs
+");
 
-if ($countResult) {
+if ($result) {
 
-  $counts =
-    $countResult->fetch_assoc();
+  $row = $result->fetch_assoc();
 
-  $pendingCount =
-    (int)($counts['pending'] ?? 0);
-
-  $acceptedCount =
-    (int)($counts['accepted'] ?? 0);
-
-  $declinedCount =
-    (int)($counts['declined'] ?? 0);
+  $totalDogs =
+    (int)($row['total'] ?? 0);
 }
 
 
-$dogCountResult =
-  $conn->query(
-    "SELECT COUNT(*) AS total
-         FROM dogs"
-  );
+/*
+| Pending
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM adoption_applications
+    WHERE status = 'pending'
+");
+
+if ($result) {
+
+  $row = $result->fetch_assoc();
+
+  $pendingApplications =
+    (int)($row['total'] ?? 0);
+}
 
 
-if ($dogCountResult) {
+/*
+| Accepted
+*/
 
-  $dogCountRow =
-    $dogCountResult->fetch_assoc();
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM adoption_applications
+    WHERE status = 'accepted'
+");
 
-  $totalDogs =
-    (int)($dogCountRow['total'] ?? 0);
+if ($result) {
+
+  $row = $result->fetch_assoc();
+
+  $acceptedApplications =
+    (int)($row['total'] ?? 0);
+}
+
+
+/*
+| Declined
+*/
+
+$result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM adoption_applications
+    WHERE status = 'declined'
+");
+
+if ($result) {
+
+  $row = $result->fetch_assoc();
+
+  $declinedApplications =
+    (int)($row['total'] ?? 0);
 }
 
 
 /*
 |--------------------------------------------------------------------------
-| LOAD DOGS
+| GET DOGS
 |--------------------------------------------------------------------------
 */
 
 $dogs = [];
 
-$dogsResult =
-  $conn->query("
-        SELECT
-            dog_id,
-            dog_breed,
-            age,
-            description,
-            dog_image,
-            added_date
-        FROM dogs
-        ORDER BY added_date DESC
-    ");
+$dogResult = $conn->query("
+    SELECT
+        dog_id,
+        dog_breed,
+        age,
+        dog_image,
+        added_date,
+        description
+    FROM dogs
+    ORDER BY dog_id DESC
+");
 
+if ($dogResult) {
 
-if ($dogsResult) {
-
-  while (
-    $row =
-    $dogsResult->fetch_assoc()
-  ) {
+  while ($row = $dogResult->fetch_assoc()) {
 
     $dogs[] = $row;
   }
@@ -903,85 +956,37 @@ if ($dogsResult) {
 
 /*
 |--------------------------------------------------------------------------
-| LOAD APPLICATIONS
+| GET APPLICATIONS
 |--------------------------------------------------------------------------
 */
 
 $applications = [];
 
-$applicationsResult =
-  $conn->query("
-        SELECT
-            aa.id AS application_id,
-            aa.owner_name,
-            aa.dog_id,
-            aa.dog_breed,
-            aa.phone,
-            aa.address,
-            aa.reason,
-            aa.status,
-            aa.decline_reason,
-            aa.created_at,
-            u.email AS applicant_email
+$applicationResult = $conn->query("
+    SELECT
+        aa.id,
+        aa.owner_name,
+        u.email,
+        aa.dog_id,
+        aa.dog_breed,
+        aa.phone,
+        aa.address,
+        aa.reason,
+        aa.status,
+        aa.decline_reason,
+        aa.created_at
+    FROM adoption_applications aa
+    LEFT JOIN users u
+        ON u.name = aa.owner_name
+    ORDER BY aa.id DESC
+");
 
-        FROM adoption_applications aa
+if ($applicationResult) {
 
-        LEFT JOIN users u
-            ON u.name = aa.owner_name
-
-        ORDER BY aa.created_at DESC
-    ");
-
-
-if ($applicationsResult) {
-
-  while (
-    $row =
-    $applicationsResult->fetch_assoc()
-  ) {
+  while ($row = $applicationResult->fetch_assoc()) {
 
     $applications[] = $row;
   }
-}
-
-
-/*
-|--------------------------------------------------------------------------
-| IMAGE HELPER
-|--------------------------------------------------------------------------
-*/
-
-function getValidImagePath($imagePath)
-{
-
-  if (empty($imagePath)) {
-
-    return 'placeholder.jpg';
-  }
-
-
-  $cleanPath =
-    ltrim(
-      $imagePath,
-      '/'
-    );
-
-
-  $fullPath =
-    __DIR__ .
-    '/../' .
-    $cleanPath;
-
-
-  if (
-    file_exists($fullPath)
-  ) {
-
-    return '../' . $cleanPath;
-  }
-
-
-  return 'placeholder.jpg';
 }
 
 ?>
@@ -998,9 +1003,7 @@ function getValidImagePath($imagePath)
     name="viewport"
     content="width=device-width, initial-scale=1.0">
 
-  <title>
-    Happy Tails Admin Dashboard
-  </title>
+  <title>Happy Tails - Admin Dashboard</title>
 
 
   <style>
@@ -1008,766 +1011,659 @@ function getValidImagePath($imagePath)
       box-sizing: border-box;
     }
 
-
     body {
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
-      background: #f6f4fb;
-      color: #222;
-    }
-
-
-    button,
-    input,
-    textarea {
-      font-family: inherit;
-    }
-
-
-    /* =========================
-           SIDEBAR
-        ========================= */
-
-    .sidebar {
-      position: fixed;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 245px;
-      background: #5a34ae;
-      color: #fff;
-      padding: 25px 18px;
-      z-index: 1000;
-    }
-
-
-    .brand {
-      font-size: 23px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 35px;
-    }
-
-
-    .brand span {
-      display: block;
-      font-size: 12px;
-      font-weight: 400;
-      opacity: .8;
-      margin-top: 4px;
-    }
-
-
-    .nav-link {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-      padding: 13px 15px;
-      margin-bottom: 8px;
-      color: #fff;
-      text-decoration: none;
-      border-radius: 10px;
-      transition: .2s;
-      cursor: pointer;
-      border: none;
-      background: transparent;
-      font-size: 14px;
-      text-align: left;
-    }
-
-
-    .nav-link:hover,
-    .nav-link.active {
-      background: rgba(255, 255, 255, .16);
-    }
-
-
-    /* =========================
-           CHAT NAVIGATION
-        ========================= */
-
-    .chat-nav-link {
-      position: relative;
-    }
-
-
-    .chat-nav-link>span:first-child {
-      flex: 1;
-    }
-
-
-    .chat-notification {
-      min-width: 22px;
-      height: 22px;
-
-      padding: 0 6px;
-
-      background: #ff4d5a;
-      color: #fff;
-
-      border-radius: 50px;
-
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-
-      font-size: 11px;
-      font-weight: 700;
-
-      box-shadow:
-        0 2px 6px rgba(0, 0, 0, .18);
-    }
-
-
-    .sidebar-bottom {
-      position: absolute;
-      left: 18px;
-      right: 18px;
-      bottom: 20px;
-    }
-
-
-    /* =========================
-           MAIN
-        ========================= */
-
-    .main {
-      margin-left: 245px;
-      padding: 30px;
-    }
-
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 28px;
-    }
-
-
-    .topbar h1 {
-      margin: 0;
-      font-size: 27px;
-      color: #2b2050;
-    }
-
-
-    .topbar p {
-      margin: 6px 0 0;
-      color: #777;
-      font-size: 14px;
-    }
-
-
-    .datetime {
-      background: #fff;
-      padding: 12px 18px;
-      border-radius: 12px;
-      box-shadow:
-        0 4px 16px rgba(0, 0, 0, .06);
-      color: #5a34ae;
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-
-    /* =========================
-           STAT CARDS
-        ========================= */
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 18px;
-      margin-bottom: 28px;
-    }
-
-
-    .stat-card {
-      background: #fff;
-      border-radius: 15px;
-      padding: 22px;
-      box-shadow:
-        0 5px 20px rgba(0, 0, 0, .06);
-    }
-
-
-    .stat-label {
-      font-size: 13px;
-      color: #777;
-      margin-bottom: 10px;
-    }
-
-
-    .stat-number {
-      font-size: 29px;
-      font-weight: 700;
-      color: #5a34ae;
-    }
-
-
-    /* =========================
-           SECTION
-        ========================= */
-
-    .section {
-      background: #fff;
-      border-radius: 16px;
-      padding: 22px;
-      margin-bottom: 25px;
-      box-shadow:
-        0 5px 20px rgba(0, 0, 0, .05);
-    }
-
-
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 15px;
-      margin-bottom: 18px;
-    }
-
-
-    .section-header h2 {
-      margin: 0;
-      font-size: 20px;
-      color: #2b2050;
-    }
-
-
-    .primary-btn {
-      border: none;
-      background: #5a34ae;
-      color: #fff;
-      padding: 11px 17px;
-      border-radius: 9px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-
-    .primary-btn:hover {
-      background: #48258f;
-    }
-
-
-    /* =========================
-           TABLE
-        ========================= */
-
-    .table-wrap {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 800px;
-    }
-
-
-    th {
-      background: #f3f0fa;
-      color: #4b4161;
-      font-size: 13px;
-      text-align: left;
-      padding: 13px;
-    }
-
-
-    td {
-      padding: 13px;
-      border-bottom: 1px solid #eee;
-      font-size: 13px;
-      vertical-align: top;
-    }
-
-
-    tr:last-child td {
-      border-bottom: none;
-    }
-
-
-    .dog-thumb {
-      width: 65px;
-      height: 55px;
-      object-fit: cover;
-      border-radius: 8px;
-      background: #eee;
-    }
-
-
-    .action-buttons {
-      display: flex;
-      gap: 7px;
-      flex-wrap: wrap;
-    }
-
-
-    .edit-btn,
-    .delete-btn,
-    .accept-btn,
-    .decline-btn {
-      border: none;
-      border-radius: 7px;
-      padding: 8px 11px;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-
-    .edit-btn {
-      background: #ece8fa;
-      color: #5a34ae;
-    }
-
-
-    .delete-btn {
-      background: #ffe8e8;
-      color: #c03939;
-    }
-
-
-    .accept-btn {
-      background: #e3f7e8;
-      color: #218838;
-    }
-
-
-    .decline-btn {
-      background: #ffe6e6;
-      color: #d64545;
-    }
-
-
-    /* =========================
-           STATUS
-        ========================= */
-
-    .status {
-      display: inline-block;
-      padding: 5px 9px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: capitalize;
-    }
-
-
-    .status.pending {
-      background: #fff3cd;
-      color: #946c00;
-    }
-
-
-    .status.accepted {
-      background: #dff5e4;
-      color: #237a38;
-    }
-
-
-    .status.declined {
-      background: #ffe0e0;
-      color: #bd3333;
-    }
-
-
-    .reason-box {
-      background: #fff4f4;
-      border-left: 3px solid #d64545;
-      padding: 8px 10px;
-      margin-top: 7px;
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-
-    .email-text {
-      color: #5a34ae;
-      word-break: break-word;
-    }
-
-
-    /* =========================
-           MODAL
-        ========================= */
-
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(20, 10, 35, .55);
-      z-index: 2000;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-
-    .modal.show {
-      display: flex;
-    }
-
-
-    .modal-content {
-      background: #fff;
-      width: 100%;
-      max-width: 520px;
-      max-height: 90vh;
-      overflow-y: auto;
-      border-radius: 16px;
-      padding: 25px;
-      position: relative;
-    }
-
-
-    .modal-content.large {
-      max-width: 1050px;
-    }
-
-
-    .modal-content h2 {
-      margin: 0 0 20px;
-      color: #2b2050;
-    }
-
-
-    .close-btn {
-      position: absolute;
-      top: 15px;
-      right: 17px;
-      width: 32px;
-      height: 32px;
-      border: none;
-      border-radius: 50%;
-      background: #f0edf5;
-      color: #555;
-      cursor: pointer;
-      font-size: 18px;
-    }
-
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-
-    .form-group label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 7px;
-      color: #514761;
-    }
-
-
-    .form-control {
-      width: 100%;
-      padding: 11px 13px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      outline: none;
-      background: #fafafa;
-    }
-
-
-    .form-control:focus {
-      border-color: #5a34ae;
-      background: #fff;
-    }
-
-
-    textarea.form-control {
-      min-height: 100px;
-      resize: vertical;
-    }
-
-
-    .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-
-    .cancel-btn {
-      border: none;
-      background: #eee;
-      padding: 11px 18px;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-
-    /* =========================
-           NEW CHAT POPUP
-        ========================= */
-
-    .chat-popup-notification {
-
-      position: fixed;
-
-      right: 25px;
-      bottom: 25px;
-
-      width: 340px;
-
-      background: #ffffff;
-
-      border-radius: 16px;
-
-      padding: 16px 18px;
-
-      display: none;
-
-      align-items: center;
-
-      gap: 14px;
-
-      box-shadow:
-        0 10px 35px rgba(0, 0, 0, 0.20);
-
-      border-left:
-        5px solid #5a34ae;
-
-      z-index: 99999;
-
-      animation:
-        chatPopupIn .35s ease;
-    }
-
-
-    .chat-popup-icon {
-
-      width: 45px;
-      height: 45px;
-
-      background: #eee8ff;
-
-      color: #5a34ae;
-
-      border-radius: 50%;
-
-      display: flex;
-
-      align-items: center;
-      justify-content: center;
-
-      font-size: 21px;
-
-      flex-shrink: 0;
-    }
-
-
-    .chat-popup-content {
-      flex: 1;
-    }
-
-
-    .chat-popup-title {
-
-      font-size: 15px;
-
-      font-weight: 700;
-
-      color: #222;
-
-      margin-bottom: 4px;
-    }
-
-
-    .chat-popup-text {
-
-      font-size: 13px;
-
-      color: #666;
-    }
-
-
-    .chat-popup-close {
-
-      border: none;
-
-      background: transparent;
-
-      font-size: 20px;
-
-      color: #888;
-
-      cursor: pointer;
-
-      padding: 3px;
-    }
-
-
-    .chat-popup-close:hover {
+      background: #f5f3fa;
       color: #333;
     }
 
 
-    @keyframes chatPopupIn {
+    /*
+|--------------------------------------------------------------------------
+| SIDEBAR
+|--------------------------------------------------------------------------
+*/
 
-      from {
+    .sidebar {
 
-        transform:
-          translateY(30px);
+      position: fixed;
 
-        opacity: 0;
+      left: 0;
+      top: 0;
 
-      }
+      width: 250px;
 
-      to {
+      height: 100vh;
 
-        transform:
-          translateY(0);
+      background: #ffffff;
 
-        opacity: 1;
+      border-right: 1px solid #ddd;
 
-      }
+      padding: 25px 18px;
+
+      z-index: 1000;
+    }
+
+    .logo {
+
+      text-align: center;
+
+      margin-bottom: 30px;
+    }
+
+    .logo img {
+
+      width: 150px;
+
+      max-width: 100%;
+
+      height: auto;
+    }
+
+    .nav-link {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      text-decoration: none;
+
+      color: #444;
+
+      padding: 14px 15px;
+
+      border-radius: 10px;
+
+      margin-bottom: 8px;
+
+      transition: 0.3s;
+    }
+
+    .nav-link:hover {
+
+      background: #eee9f7;
+
+      color: #5a34ae;
+    }
+
+    .nav-link.active {
+
+      background: #e8e0f2;
+
+      color: #5a34ae;
+
+      font-weight: bold;
+    }
+
+    .chat-nav-link {
+
+      position: relative;
+    }
+
+    .chat-notification {
+
+      background: #e74c3c;
+
+      color: white;
+
+      min-width: 22px;
+
+      height: 22px;
+
+      border-radius: 50%;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      font-size: 12px;
+
+      font-weight: bold;
     }
 
 
-    /* =========================
-           MOBILE
-        ========================= */
+    /*
+|--------------------------------------------------------------------------
+| MAIN
+|--------------------------------------------------------------------------
+*/
+
+    .main {
+
+      margin-left: 250px;
+
+      padding: 30px;
+
+      min-height: 100vh;
+    }
+
+    .topbar {
+
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+
+      margin-bottom: 30px;
+    }
+
+    .topbar h1 {
+
+      margin: 0;
+
+      color: #5a34ae;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| STAT CARDS
+|--------------------------------------------------------------------------
+*/
+
+    .stats {
+
+      display: grid;
+
+      grid-template-columns:
+        repeat(4, 1fr);
+
+      gap: 20px;
+
+      margin-bottom: 35px;
+    }
+
+    .stat-card {
+
+      background: white;
+
+      padding: 25px;
+
+      border-radius: 15px;
+
+      box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .stat-card h3 {
+
+      margin: 0 0 10px;
+
+      color: #777;
+
+      font-size: 15px;
+    }
+
+    .stat-number {
+
+      font-size: 32px;
+
+      font-weight: bold;
+
+      color: #5a34ae;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| SECTION
+|--------------------------------------------------------------------------
+*/
+
+    .section {
+
+      background: white;
+
+      border-radius: 15px;
+
+      padding: 25px;
+
+      margin-bottom: 30px;
+
+      box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.06);
+    }
+
+    .section-header {
+
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+
+      margin-bottom: 20px;
+    }
+
+    .section-header h2 {
+
+      margin: 0;
+
+      color: #5a34ae;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| BUTTONS
+|--------------------------------------------------------------------------
+*/
+
+    .btn {
+
+      border: none;
+
+      border-radius: 8px;
+
+      padding: 10px 16px;
+
+      cursor: pointer;
+
+      font-size: 14px;
+
+      transition: 0.3s;
+    }
+
+    .btn-primary {
+
+      background: #5a34ae;
+
+      color: white;
+    }
+
+    .btn-primary:hover {
+
+      background: #48258f;
+    }
+
+    .btn-success {
+
+      background: #2e9d55;
+
+      color: white;
+    }
+
+    .btn-success:hover {
+
+      background: #247d43;
+    }
+
+    .btn-danger {
+
+      background: #d9534f;
+
+      color: white;
+    }
+
+    .btn-danger:hover {
+
+      background: #b93d39;
+    }
+
+    .btn-secondary {
+
+      background: #777;
+
+      color: white;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| TABLE
+|--------------------------------------------------------------------------
+*/
+
+    .table-container {
+
+      width: 100%;
+
+      overflow-x: auto;
+    }
+
+    table {
+
+      width: 100%;
+
+      border-collapse: collapse;
+
+      min-width: 900px;
+    }
+
+    th {
+
+      background: #f1edf8;
+
+      color: #5a34ae;
+
+      text-align: left;
+
+      padding: 13px;
+
+      font-size: 14px;
+    }
+
+    td {
+
+      padding: 13px;
+
+      border-bottom: 1px solid #eee;
+
+      vertical-align: top;
+
+      font-size: 14px;
+    }
+
+    td img {
+
+      width: 70px;
+
+      height: 70px;
+
+      object-fit: cover;
+
+      border-radius: 10px;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| STATUS
+|--------------------------------------------------------------------------
+*/
+
+    .status {
+
+      display: inline-block;
+
+      padding: 6px 10px;
+
+      border-radius: 20px;
+
+      font-size: 12px;
+
+      font-weight: bold;
+    }
+
+    .status-pending {
+
+      background: #fff2cc;
+
+      color: #9a7100;
+    }
+
+    .status-accepted {
+
+      background: #dff4e5;
+
+      color: #218838;
+    }
+
+    .status-declined {
+
+      background: #fbe1e1;
+
+      color: #c0392b;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| ACTION BUTTONS
+|--------------------------------------------------------------------------
+*/
+
+    .action-buttons {
+
+      display: flex;
+
+      gap: 7px;
+
+      flex-wrap: wrap;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| MODAL
+|--------------------------------------------------------------------------
+*/
+
+    .modal {
+
+      display: none;
+
+      position: fixed;
+
+      z-index: 2000;
+
+      left: 0;
+
+      top: 0;
+
+      width: 100%;
+
+      height: 100%;
+
+      background:
+        rgba(0, 0, 0, 0.5);
+
+      align-items: center;
+
+      justify-content: center;
+
+      padding: 20px;
+    }
+
+    .modal-content {
+
+      background: white;
+
+      width: 100%;
+
+      max-width: 600px;
+
+      max-height: 90vh;
+
+      overflow-y: auto;
+
+      border-radius: 15px;
+
+      padding: 25px;
+
+      position: relative;
+    }
+
+    .modal-content h2 {
+
+      color: #5a34ae;
+
+      margin-top: 0;
+    }
+
+    .close {
+
+      position: absolute;
+
+      right: 20px;
+
+      top: 15px;
+
+      font-size: 28px;
+
+      cursor: pointer;
+
+      color: #777;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| FORM
+|--------------------------------------------------------------------------
+*/
+
+    .form-group {
+
+      margin-bottom: 17px;
+    }
+
+    .form-group label {
+
+      display: block;
+
+      margin-bottom: 7px;
+
+      font-weight: bold;
+
+      color: #444;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+
+      width: 100%;
+
+      padding: 11px;
+
+      border: 1px solid #ccc;
+
+      border-radius: 8px;
+
+      font-family: inherit;
+    }
+
+    .form-group textarea {
+
+      resize: vertical;
+
+      min-height: 100px;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| IMAGE PICKER
+|--------------------------------------------------------------------------
+*/
+
+    .image-picker {
+
+      display: grid;
+
+      grid-template-columns:
+        repeat(5, 1fr);
+
+      gap: 10px;
+
+      margin-top: 10px;
+    }
+
+    .image-option {
+
+      border: 2px solid transparent;
+
+      border-radius: 8px;
+
+      cursor: pointer;
+
+      overflow: hidden;
+    }
+
+    .image-option img {
+
+      width: 100%;
+
+      height: 80px;
+
+      object-fit: cover;
+
+      display: block;
+    }
+
+    .image-option.selected {
+
+      border-color: #5a34ae;
+    }
+
+
+    /*
+|--------------------------------------------------------------------------
+| MOBILE
+|--------------------------------------------------------------------------
+*/
 
     .mobile-menu {
+
       display: none;
+
+      border: none;
+
+      background: #5a34ae;
+
+      color: white;
+
+      padding: 10px 14px;
+
+      border-radius: 8px;
+
+      cursor: pointer;
     }
 
 
     @media (max-width: 1000px) {
 
-      .sidebar {
-        width: 210px;
-      }
-
-      .main {
-        margin-left: 210px;
-        padding: 20px;
-      }
-
       .stats {
+
         grid-template-columns:
           repeat(2, 1fr);
       }
     }
 
 
-    @media (max-width: 750px) {
+    @media (max-width: 768px) {
 
       .sidebar {
-        display: none;
+
+        transform:
+          translateX(-100%);
+
+        transition: 0.3s;
       }
 
+      .sidebar.show {
+
+        transform:
+          translateX(0);
+      }
 
       .main {
-        margin-left: 0;
-        padding: 15px;
-        padding-top: 70px;
-      }
 
+        margin-left: 0;
+
+        padding: 20px;
+      }
 
       .mobile-menu {
 
-        display: flex;
-
-        position: fixed;
-
-        top: 0;
-        left: 0;
-        right: 0;
-
-        height: 58px;
-
-        background: #5a34ae;
-
-        color: #fff;
-
-        z-index: 1500;
-
-        align-items: center;
-
-        justify-content:
-          space-between;
-
-        padding: 0 16px;
+        display: block;
       }
-
-
-      .mobile-menu strong {
-        font-size: 17px;
-      }
-
-
-      .mobile-menu button {
-
-        border: none;
-
-        background: transparent;
-
-        color: #fff;
-
-        font-size: 24px;
-
-        cursor: pointer;
-      }
-
 
       .topbar {
 
-        flex-direction: column;
-
-        align-items:
-          flex-start;
+        gap: 15px;
       }
-
 
       .stats {
 
-        grid-template-columns:
-          1fr 1fr;
-      }
-
-
-      .chat-popup-notification {
-
-        left: 15px;
-        right: 15px;
-
-        bottom: 15px;
-
-        width: auto;
-      }
-    }
-
-
-    @media (max-width: 500px) {
-
-      .stats {
         grid-template-columns: 1fr;
-      }
-
-
-      .section {
-        padding: 15px;
-      }
-
-
-      .modal {
-        padding: 10px;
-      }
-
-
-      .modal-content {
-        padding: 20px 15px;
       }
     }
   </style>
@@ -1778,39 +1674,17 @@ function getValidImagePath($imagePath)
 <body>
 
 
-  <!-- =========================
-     MOBILE TOP BAR
-========================= -->
-
-  <div class="mobile-menu">
-
-    <strong>
-      Happy Tails
-    </strong>
-
-    <button
-      onclick="toggleMobileSidebar()">
-      ☰
-    </button>
-
-  </div>
-
-
-  <!-- =========================
+  <!-- =========================================================
      SIDEBAR
-========================= -->
+========================================================= -->
 
-  <aside
-    class="sidebar"
-    id="sidebar">
+  <div class="sidebar" id="sidebar">
 
-    <div class="brand">
+    <div class="logo">
 
-      🐾 Happy Tails
-
-      <span>
-        Admin Dashboard
-      </span>
+      <img
+        src="../assets/images/happy-tails.png"
+        alt="Happy Tails">
 
     </div>
 
@@ -1818,31 +1692,25 @@ function getValidImagePath($imagePath)
     <a
       href="#dashboard"
       class="nav-link active">
-
-      🏠 Dashboard
-
+      <span>🏠 Dashboard</span>
     </a>
 
 
     <a
       href="#dogs"
       class="nav-link">
-
-      🐕 Dogs
-
+      <span>🐶 Dogs</span>
     </a>
 
 
     <a
       href="#applications"
       class="nav-link">
-
-      📋 Applications
-
+      <span>📋 Applications</span>
     </a>
 
 
-    <!-- CHAT SUPPORT -->
+    <!-- CHAT SUPPORT MUST STAY -->
 
     <a
       href="admin_chat.php"
@@ -1852,11 +1720,9 @@ function getValidImagePath($imagePath)
         💬 Chat Support
       </span>
 
-
       <?php if ($unreadChatCount > 0): ?>
 
-        <span
-          class="chat-notification">
+        <span class="chat-notification">
 
           <?php
           echo $unreadChatCount;
@@ -1869,70 +1735,52 @@ function getValidImagePath($imagePath)
     </a>
 
 
-    <div class="sidebar-bottom">
+    <a
+      href="admin-logout.php"
+      class="nav-link">
+      <span>🚪 Logout</span>
+    </a>
 
-      <a
-        href="../index.php"
-        class="nav-link">
+  </div>
 
-        ← Back to Website
 
-      </a>
+
+  <!-- =========================================================
+     MAIN
+========================================================= -->
+
+  <div class="main">
+
+
+    <div class="topbar">
+
+      <button
+        class="mobile-menu"
+        onclick="toggleSidebar()">
+        ☰ Menu
+      </button>
+
+      <h1>
+        Happy Tails Admin Dashboard
+      </h1>
 
     </div>
 
-  </aside>
 
 
-  <!-- =========================
-     MAIN
-========================= -->
-
-  <main class="main">
-
-
-    <!-- TOPBAR -->
+    <!-- =====================================================
+         STATISTICS
+    ====================================================== -->
 
     <div
-      class="topbar"
+      class="stats"
       id="dashboard">
-
-      <div>
-
-        <h1>
-          Admin Dashboard
-        </h1>
-
-        <p>
-          Manage dogs and adoption applications
-        </p>
-
-      </div>
-
-
-      <div
-        class="datetime"
-        id="datetime">
-
-        Loading...
-
-      </div>
-
-    </div>
-
-
-    <!-- =========================
-         STATISTICS
-    ========================= -->
-
-    <div class="stats">
-
 
       <div class="stat-card">
 
-        <div class="stat-label">
+        <h3>
           Total Dogs
-        </div>
+        </h3>
 
         <div class="stat-number">
 
@@ -1947,14 +1795,14 @@ function getValidImagePath($imagePath)
 
       <div class="stat-card">
 
-        <div class="stat-label">
+        <h3>
           Pending Applications
-        </div>
+        </h3>
 
         <div class="stat-number">
 
           <?php
-          echo $pendingCount;
+          echo $pendingApplications;
           ?>
 
         </div>
@@ -1964,14 +1812,14 @@ function getValidImagePath($imagePath)
 
       <div class="stat-card">
 
-        <div class="stat-label">
+        <h3>
           Accepted Applications
-        </div>
+        </h3>
 
         <div class="stat-number">
 
           <?php
-          echo $acceptedCount;
+          echo $acceptedApplications;
           ?>
 
         </div>
@@ -1981,14 +1829,14 @@ function getValidImagePath($imagePath)
 
       <div class="stat-card">
 
-        <div class="stat-label">
+        <h3>
           Declined Applications
-        </div>
+        </h3>
 
         <div class="stat-number">
 
           <?php
-          echo $declinedCount;
+          echo $declinedApplications;
           ?>
 
         </div>
@@ -1998,32 +1846,31 @@ function getValidImagePath($imagePath)
     </div>
 
 
-    <!-- =========================
-         DOGS SECTION
-    ========================= -->
 
-    <section
+    <!-- =====================================================
+         DOGS
+    ====================================================== -->
+
+    <div
       class="section"
       id="dogs">
 
       <div class="section-header">
 
         <h2>
-          Dogs
+          Available Dogs
         </h2>
 
         <button
-          class="primary-btn"
-          onclick="openModal('addDogModal')">
-
+          class="btn btn-primary"
+          onclick="openAddDogModal()">
           + Add Dog
-
         </button>
 
       </div>
 
 
-      <div class="table-wrap">
+      <div class="table-container">
 
         <table>
 
@@ -2062,7 +1909,6 @@ function getValidImagePath($imagePath)
 
           <tbody>
 
-
             <?php if (empty($dogs)): ?>
 
               <tr>
@@ -2070,16 +1916,12 @@ function getValidImagePath($imagePath)
                 <td
                   colspan="6"
                   style="text-align:center;">
-
                   No dogs found.
-
                 </td>
 
               </tr>
 
-
             <?php else: ?>
-
 
               <?php foreach ($dogs as $dog): ?>
 
@@ -2088,34 +1930,14 @@ function getValidImagePath($imagePath)
                   <td>
 
                     <img
-                      class="dog-thumb"
                       src="<?php
-                            echo htmlspecialchars(
-                              getValidImagePath(
+                            echo e(
+                              getImageUrl(
                                 $dog['dog_image']
                               )
                             );
                             ?>"
-                      alt="<?php
-                            echo htmlspecialchars(
-                              $dog['dog_breed']
-                            );
-                            ?>">
-
-                  </td>
-
-
-                  <td>
-
-                    <strong>
-
-                      <?php
-                      echo htmlspecialchars(
-                        $dog['dog_breed']
-                      );
-                      ?>
-
-                    </strong>
+                      alt="Dog">
 
                   </td>
 
@@ -2123,21 +1945,30 @@ function getValidImagePath($imagePath)
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
+                    echo e(
+                      $dog['dog_breed']
+                    );
+                    ?>
+
+                  </td>
+
+
+                  <td>
+
+                    <?php
+                    echo e(
                       $dog['age']
                     );
                     ?>
 
-                    yrs
-
                   </td>
 
 
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
-                      $dog['description'] ?? ''
+                    echo e(
+                      $dog['description']
                     );
                     ?>
 
@@ -2147,7 +1978,7 @@ function getValidImagePath($imagePath)
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
+                    echo e(
                       $dog['added_date']
                     );
                     ?>
@@ -2157,69 +1988,49 @@ function getValidImagePath($imagePath)
 
                   <td>
 
-                    <div class="action-buttons">
-
-
-                      <!-- EDIT -->
+                    <div
+                      class="action-buttons">
 
                       <button
-                        class="edit-btn"
-                        onclick='openEditDog(<?php
-                                              echo json_encode([
-                                                "dog_id" =>
-                                                $dog["dog_id"],
-
-                                                "dog_breed" =>
-                                                $dog["dog_breed"],
-
-                                                "age" =>
-                                                $dog["age"],
-
-                                                "description" =>
-                                                $dog["description"]
-                                                  ?? "",
-
-                                                "dog_image" =>
-                                                $dog["dog_image"]
-                                                  ?? ""
-                                              ]);
-                                              ?>)'>
-
+                        class="btn btn-primary"
+                        onclick='openEditDogModal(
+                                        <?php
+                                        echo json_encode(
+                                          $dog,
+                                          JSON_HEX_TAG |
+                                            JSON_HEX_APOS |
+                                            JSON_HEX_QUOT |
+                                            JSON_HEX_AMP
+                                        );
+                                        ?>
+                                    )'>
                         Edit
-
                       </button>
 
 
-                      <!-- DELETE -->
-
                       <form
                         method="POST"
-                        style="display:inline;"
+                        action="delete-dog.php"
                         onsubmit="
-                                            return confirm(
-                                                'Are you sure you want to delete this dog?'
-                                            );
-                                        ">
+                                        return confirm(
+                                            'Are you sure you want to delete this dog?'
+                                        );
+                                    ">
 
                         <input
                           type="hidden"
                           name="dog_id"
                           value="<?php
-                                  echo (int)
-                                  $dog['dog_id'];
+                                  echo (int)$dog['dog_id'];
                                   ?>">
 
                         <button
                           type="submit"
-                          name="delete_dog"
-                          class="delete-btn">
-
+                          class="btn btn-danger">
                           Delete
-
                         </button>
 
                       </form>
-
 
                     </div>
 
@@ -2229,9 +2040,7 @@ function getValidImagePath($imagePath)
 
               <?php endforeach; ?>
 
-
             <?php endif; ?>
-
 
           </tbody>
 
@@ -2239,14 +2048,15 @@ function getValidImagePath($imagePath)
 
       </div>
 
-    </section>
+    </div>
 
 
-    <!-- =========================
+
+    <!-- =====================================================
          APPLICATIONS
-    ========================= -->
+    ====================================================== -->
 
-    <section
+    <div
       class="section"
       id="applications">
 
@@ -2259,7 +2069,7 @@ function getValidImagePath($imagePath)
       </div>
 
 
-      <div class="table-wrap">
+      <div class="table-container">
 
         <table>
 
@@ -2306,7 +2116,6 @@ function getValidImagePath($imagePath)
 
           <tbody>
 
-
             <?php if (empty($applications)): ?>
 
               <tr>
@@ -2314,34 +2123,25 @@ function getValidImagePath($imagePath)
                 <td
                   colspan="8"
                   style="text-align:center;">
-
                   No applications found.
-
                 </td>
 
               </tr>
 
-
             <?php else: ?>
 
-
               <?php foreach (
-                $applications
-                as $application
+                $applications as $application
               ): ?>
 
-
                 <tr>
-
-
-                  <!-- APPLICANT -->
 
                   <td>
 
                     <strong>
 
                       <?php
-                      echo htmlspecialchars(
+                      echo e(
                         $application['owner_name']
                       );
                       ?>
@@ -2351,34 +2151,21 @@ function getValidImagePath($imagePath)
                   </td>
 
 
-                  <!-- EMAIL -->
-
                   <td>
 
-                    <span
-                      class="email-text">
-
-                      <?php
-
-                      echo htmlspecialchars(
-                        $application['applicant_email']
-                          ??
-                          'No email found'
-                      );
-
-                      ?>
-
-                    </span>
+                    <?php
+                    echo e(
+                      $application['email']
+                    );
+                    ?>
 
                   </td>
 
 
-                  <!-- DOG -->
-
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
+                    echo e(
                       $application['dog_breed']
                     );
                     ?>
@@ -2386,12 +2173,10 @@ function getValidImagePath($imagePath)
                   </td>
 
 
-                  <!-- PHONE -->
-
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
+                    echo e(
                       $application['phone']
                     );
                     ?>
@@ -2399,12 +2184,10 @@ function getValidImagePath($imagePath)
                   </td>
 
 
-                  <!-- ADDRESS -->
-
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
+                    echo e(
                       $application['address']
                     );
                     ?>
@@ -2412,40 +2195,64 @@ function getValidImagePath($imagePath)
                   </td>
 
 
-                  <!-- REASON -->
+                  <td>
+
+                    <?php
+                    echo e(
+                      $application['reason']
+                    );
+                    ?>
+
+                  </td>
+
 
                   <td>
 
                     <?php
-                    echo htmlspecialchars(
-                      $application['reason'] ?? ''
-                    );
+
+                    $status =
+                      strtolower(
+                        $application['status'] ?? 'pending'
+                      );
+
                     ?>
 
+                    <span
+                      class="
+                                    status
+                                    status-<?php
+                                            echo e($status);
+                                            ?>
+                                ">
 
-                    <?php
+                      <?php
+                      echo ucfirst(
+                        e($status)
+                      );
+                      ?>
 
-                    if (
-                      $application['status'] === 'declined' &&
+                    </span>
+
+
+                    <?php if (
+                      $status === 'declined' &&
                       !empty($application['decline_reason'])
-                    ):
-
-                    ?>
+                    ): ?>
 
                       <div
-                        class="reason-box">
+                        style="
+                                        margin-top:8px;
+                                        font-size:12px;
+                                        color:#c0392b;
+                                    ">
 
                         <strong>
-                          Decline Reason:
+                          Reason:
                         </strong>
 
-                        <br>
-
                         <?php
-                        echo nl2br(
-                          htmlspecialchars(
-                            $application['decline_reason']
-                          )
+                        echo e(
+                          $application['decline_reason']
                         );
                         ?>
 
@@ -2456,76 +2263,39 @@ function getValidImagePath($imagePath)
                   </td>
 
 
-                  <!-- STATUS -->
-
                   <td>
 
-                    <?php
-
-                    $status =
-                      $application['status']
-                      ?: 'pending';
-
-                    ?>
-
-                    <span
-                      class="status <?php
-                                    echo htmlspecialchars(
-                                      $status
-                                    );
-                                    ?>">
-
-                      <?php
-                      echo htmlspecialchars(
-                        $status
-                      );
-                      ?>
-
-                    </span>
-
-                  </td>
-
-
-                  <!-- ACTION -->
-
-                  <td>
-
-                    <?php
-                    if (
+                    <?php if (
                       $status === 'pending'
-                    ):
-                    ?>
+                    ): ?>
 
                       <div
                         class="action-buttons">
-
 
                         <!-- ACCEPT -->
 
                         <form
                           method="POST"
-                          style="display:inline;"
-                          onsubmit="
-                                            return confirm(
-                                                'Accept this application?'
-                                            );
-                                        ">
+                          action="">
 
                           <input
                             type="hidden"
                             name="application_id"
                             value="<?php
                                     echo (int)
-                                    $application['application_id'];
+                                    $application['id'];
                                     ?>">
 
                           <button
                             type="submit"
                             name="accept_application"
-                            class="accept-btn">
-
+                            class="btn btn-success"
+                            onclick="
+                                                return confirm(
+                                                    'Accept this application? The applicant will receive an email.'
+                                                );
+                                            ">
                             Accept
-
                           </button>
 
                         </form>
@@ -2535,43 +2305,29 @@ function getValidImagePath($imagePath)
 
                         <button
                           type="button"
-                          class="decline-btn"
+                          class="btn btn-danger"
                           onclick="
                                             openDeclineModal(
                                                 <?php
                                                 echo (int)
-                                                $application['application_id'];
-                                                ?>,
-                                                '<?php
-                                                  echo htmlspecialchars(
-                                                    $application['owner_name'],
-                                                    ENT_QUOTES
-                                                  );
-                                                  ?>'
+                                                $application['id'];
+                                                ?>
                                             )
                                         ">
-
                           Decline
-
                         </button>
-
 
                       </div>
 
-
                     <?php else: ?>
-
 
                       <span
                         style="
-                                        color:#999;
-                                        font-size:12px;
+                                        color:#777;
+                                        font-size:13px;
                                     ">
-
                         No action
-
                       </span>
-
 
                     <?php endif; ?>
 
@@ -2579,12 +2335,9 @@ function getValidImagePath($imagePath)
 
                 </tr>
 
-
               <?php endforeach; ?>
 
-
             <?php endif; ?>
-
 
           </tbody>
 
@@ -2592,10 +2345,10 @@ function getValidImagePath($imagePath)
 
       </div>
 
-    </section>
+    </div>
 
+  </div>
 
-  </main>
 
 
   <!-- =========================================================
@@ -2608,13 +2361,11 @@ function getValidImagePath($imagePath)
 
     <div class="modal-content">
 
-      <button
-        class="close-btn"
-        onclick="closeModal('addDogModal')">
-
-        ×
-
-      </button>
+      <span
+        class="close"
+        onclick="closeAddDogModal()">
+        &times;
+      </span>
 
 
       <h2>
@@ -2624,9 +2375,7 @@ function getValidImagePath($imagePath)
 
       <form
         method="POST"
-        action="adddog.php"
-        enctype="multipart/form-data">
-
+        action="add-dog.php">
 
         <div class="form-group">
 
@@ -2637,8 +2386,6 @@ function getValidImagePath($imagePath)
           <input
             type="text"
             name="dog_breed"
-            class="form-control"
-            placeholder="Enter dog breed"
             required>
 
         </div>
@@ -2653,8 +2400,6 @@ function getValidImagePath($imagePath)
           <input
             type="text"
             name="age"
-            class="form-control"
-            placeholder="Enter age"
             required>
 
         </div>
@@ -2668,8 +2413,7 @@ function getValidImagePath($imagePath)
 
           <textarea
             name="description"
-            class="form-control"
-            placeholder="Enter dog description"></textarea>
+            required></textarea>
 
         </div>
 
@@ -2677,46 +2421,64 @@ function getValidImagePath($imagePath)
         <div class="form-group">
 
           <label>
-            Dog Image
+            Choose Dog Image
           </label>
 
+
           <input
-            type="file"
+            type="hidden"
             name="dog_image"
-            class="form-control"
-            accept=".jpg,.jpeg,.png,.gif,.webp,.jfif">
+            id="addDogImage"
+            required>
+
+
+          <div class="image-picker">
+
+            <?php foreach (
+              $availableImages as $image
+            ): ?>
+
+              <div
+                class="image-option"
+                onclick="
+                                selectAddImage(
+                                    this,
+                                    <?php
+                                    echo json_encode($image);
+                                    ?>
+                                )
+                            ">
+
+                <img
+                  src="<?php
+                        echo e(
+                          '../assets/images/' .
+                            rawurlencode($image)
+                        );
+                        ?>"
+                  alt="">
+
+              </div>
+
+            <?php endforeach; ?>
+
+          </div>
 
         </div>
 
 
-        <div class="modal-footer">
-
-          <button
-            type="button"
-            class="cancel-btn"
-            onclick="closeModal('addDogModal')">
-
-            Cancel
-
-          </button>
-
-
-          <button
-            type="submit"
-            class="primary-btn"
-            name="add_dog">
-
-            Save Dog
-
-          </button>
-
-        </div>
+        <button
+          type="submit"
+          class="btn btn-primary">
+          Add Dog
+        </button>
 
       </form>
 
     </div>
 
   </div>
+
 
 
   <!-- =========================================================
@@ -2729,13 +2491,11 @@ function getValidImagePath($imagePath)
 
     <div class="modal-content">
 
-      <button
-        class="close-btn"
-        onclick="closeModal('editDogModal')">
-
-        ×
-
-      </button>
+      <span
+        class="close"
+        onclick="closeEditDogModal()">
+        &times;
+      </span>
 
 
       <h2>
@@ -2745,9 +2505,7 @@ function getValidImagePath($imagePath)
 
       <form
         method="POST"
-        action=""
-        enctype="multipart/form-data">
-
+        action="edit-dog.php">
 
         <input
           type="hidden"
@@ -2763,9 +2521,8 @@ function getValidImagePath($imagePath)
 
           <input
             type="text"
-            name="breed"
+            name="dog_breed"
             id="editDogBreed"
-            class="form-control"
             required>
 
         </div>
@@ -2781,7 +2538,6 @@ function getValidImagePath($imagePath)
             type="text"
             name="age"
             id="editDogAge"
-            class="form-control"
             required>
 
         </div>
@@ -2796,7 +2552,7 @@ function getValidImagePath($imagePath)
           <textarea
             name="description"
             id="editDogDescription"
-            class="form-control"></textarea>
+            required></textarea>
 
         </div>
 
@@ -2804,40 +2560,60 @@ function getValidImagePath($imagePath)
         <div class="form-group">
 
           <label>
-            Replace Image
+            Choose Dog Image
           </label>
 
+
           <input
-            type="file"
+            type="hidden"
             name="dog_image"
-            class="form-control"
-            accept=".jpg,.jpeg,.png,.gif,.webp,.jfif">
+            id="editDogImage"
+            required>
+
+
+          <div class="image-picker">
+
+            <?php foreach (
+              $availableImages as $image
+            ): ?>
+
+              <div
+                class="image-option edit-image-option"
+                data-image="<?php
+                            echo e($image);
+                            ?>"
+                onclick="
+                                selectEditImage(
+                                    this,
+                                    <?php
+                                    echo json_encode($image);
+                                    ?>
+                                )
+                            ">
+
+                <img
+                  src="<?php
+                        echo e(
+                          '../assets/images/' .
+                            rawurlencode($image)
+                        );
+                        ?>"
+                  alt="">
+
+              </div>
+
+            <?php endforeach; ?>
+
+          </div>
 
         </div>
 
 
-        <div class="modal-footer">
-
-          <button
-            type="button"
-            class="cancel-btn"
-            onclick="closeModal('editDogModal')">
-
-            Cancel
-
-          </button>
-
-
-          <button
-            type="submit"
-            name="update_dog"
-            class="primary-btn">
-
-            Save Changes
-
-          </button>
-
-        </div>
+        <button
+          type="submit"
+          class="btn btn-primary">
+          Update Dog
+        </button>
 
       </form>
 
@@ -2846,8 +2622,9 @@ function getValidImagePath($imagePath)
   </div>
 
 
+
   <!-- =========================================================
-     DECLINE APPLICATION MODAL
+     DECLINE MODAL
 ========================================================= -->
 
   <div
@@ -2856,13 +2633,11 @@ function getValidImagePath($imagePath)
 
     <div class="modal-content">
 
-      <button
-        class="close-btn"
-        onclick="closeModal('declineModal')">
-
-        ×
-
-      </button>
+      <span
+        class="close"
+        onclick="closeDeclineModal()">
+        &times;
+      </span>
 
 
       <h2>
@@ -2870,25 +2645,15 @@ function getValidImagePath($imagePath)
       </h2>
 
 
-      <p
-        style="
-                color:#666;
-                font-size:14px;
-                margin-top:-8px;
-                margin-bottom:18px;
-            ">
-
+      <p>
         Please enter the reason for declining
-        <strong id="declineApplicantName"></strong>'s
-        application.
-
+        this application.
       </p>
 
 
       <form
         method="POST"
         action="">
-
 
         <input
           type="hidden"
@@ -2899,45 +2664,31 @@ function getValidImagePath($imagePath)
         <div class="form-group">
 
           <label>
-            Decline Reason
+            Reason for Decline
           </label>
 
           <textarea
             name="decline_reason"
-            class="form-control"
-            placeholder="Enter the reason for declining this application..."
             required
-            id="declineReason"></textarea>
+            placeholder="Enter the reason..."></textarea>
 
         </div>
 
 
-        <div class="modal-footer">
-
-          <button
-            type="button"
-            class="cancel-btn"
-            onclick="closeModal('declineModal')">
-
-            Cancel
-
-          </button>
+        <button
+          type="submit"
+          name="decline_application"
+          class="btn btn-danger">
+          Decline & Send Email
+        </button>
 
 
-          <button
-            type="submit"
-            name="decline_application"
-            class="decline-btn"
-            style="
-                        padding:11px 18px;
-                        font-size:13px;
-                    ">
-
-            Decline Application
-
-          </button>
-
-        </div>
+        <button
+          type="button"
+          class="btn btn-secondary"
+          onclick="closeDeclineModal()">
+          Cancel
+        </button>
 
       </form>
 
@@ -2946,112 +2697,187 @@ function getValidImagePath($imagePath)
   </div>
 
 
-  <!-- =========================================================
-     NEW CHAT POPUP
-========================================================= -->
-
-  <div
-    id="chatPopupNotification"
-    class="chat-popup-notification">
-
-    <div class="chat-popup-icon">
-      💬
-    </div>
-
-
-    <div class="chat-popup-content">
-
-      <div class="chat-popup-title">
-        New Chat Message
-      </div>
-
-      <div class="chat-popup-text">
-        A user has sent you a new message.
-      </div>
-
-    </div>
-
-
-    <button
-      type="button"
-      class="chat-popup-close"
-      onclick="closeChatPopup()">
-
-      ×
-
-    </button>
-
-  </div>
-
 
   <script>
     /*
 |--------------------------------------------------------------------------
-| MODAL FUNCTIONS
+| SIDEBAR
 |--------------------------------------------------------------------------
 */
 
-    function openModal(id) {
-
-      const modal =
-        document.getElementById(id);
-
-      if (modal) {
-
-        modal.classList.add('show');
-
-      }
-    }
-
-
-    function closeModal(id) {
-
-      const modal =
-        document.getElementById(id);
-
-      if (modal) {
-
-        modal.classList.remove('show');
-
-      }
+    function toggleSidebar() {
+      document
+        .getElementById('sidebar')
+        .classList.toggle('show');
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | EDIT DOG
+    | ADD DOG MODAL
     |--------------------------------------------------------------------------
     */
 
-    function openEditDog(dog) {
-
-      document.getElementById(
-          'editDogId'
-        ).value =
-        dog.dog_id;
-
-
-      document.getElementById(
-          'editDogBreed'
-        ).value =
-        dog.dog_breed;
+    function openAddDogModal() {
+      document
+        .getElementById('addDogModal')
+        .style.display = 'flex';
+    }
 
 
-      document.getElementById(
-          'editDogAge'
-        ).value =
-        dog.age;
+    function closeAddDogModal() {
+      document
+        .getElementById('addDogModal')
+        .style.display = 'none';
+    }
 
 
-      document.getElementById(
-          'editDogDescription'
-        ).value =
-        dog.description || '';
+    /*
+    |--------------------------------------------------------------------------
+    | SELECT ADD IMAGE
+    |--------------------------------------------------------------------------
+    */
+
+    function selectAddImage(element, image) {
+      document
+        .querySelectorAll(
+          '#addDogModal .image-option'
+        )
+        .forEach(function(item) {
+
+          item.classList.remove(
+            'selected'
+          );
+
+        });
 
 
-      openModal(
-        'editDogModal'
+      element.classList.add('selected');
+
+
+      document
+        .getElementById('addDogImage')
+        .value = image;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | EDIT DOG MODAL
+    |--------------------------------------------------------------------------
+    */
+
+    function openEditDogModal(dog) {
+
+      document
+        .getElementById('editDogModal')
+        .style.display = 'flex';
+
+
+      document
+        .getElementById('editDogId')
+        .value = dog.dog_id || '';
+
+
+      document
+        .getElementById('editDogBreed')
+        .value = dog.dog_breed || '';
+
+
+      document
+        .getElementById('editDogAge')
+        .value = dog.age || '';
+
+
+      document
+        .getElementById('editDogDescription')
+        .value = dog.description || '';
+
+
+      /*
+      | Convert database image path
+      | to filename
+      */
+
+      let imageName =
+        dog.dog_image || '';
+
+      imageName =
+        imageName
+        .split('/')
+        .pop();
+
+
+      document
+        .getElementById('editDogImage')
+        .value = imageName;
+
+
+      /*
+      | Highlight currently selected image
+      */
+
+      document
+        .querySelectorAll(
+          '#editDogModal .edit-image-option'
+        )
+        .forEach(function(item) {
+
+          item.classList.remove(
+            'selected'
+          );
+
+
+          if (
+            item.dataset.image ===
+            imageName
+          ) {
+
+            item.classList.add(
+              'selected'
+            );
+          }
+
+        });
+    }
+
+
+    function closeEditDogModal() {
+      document
+        .getElementById('editDogModal')
+        .style.display = 'none';
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SELECT EDIT IMAGE
+    |--------------------------------------------------------------------------
+    */
+
+    function selectEditImage(element, image) {
+
+      document
+        .querySelectorAll(
+          '#editDogModal .image-option'
+        )
+        .forEach(function(item) {
+
+          item.classList.remove(
+            'selected'
+          );
+
+        });
+
+
+      element.classList.add(
+        'selected'
       );
+
+
+      document
+        .getElementById('editDogImage')
+        .value = image;
     }
 
 
@@ -3061,471 +2887,135 @@ function getValidImagePath($imagePath)
     |--------------------------------------------------------------------------
     */
 
-    function openDeclineModal(
-      applicationId,
-      applicantName
-    ) {
+    function openDeclineModal(applicationId) {
 
-      document.getElementById(
+      document
+        .getElementById(
           'declineApplicationId'
-        ).value =
-        applicationId;
+        )
+        .value = applicationId;
 
 
-      document.getElementById(
-          'declineApplicantName'
-        ).textContent =
-        applicantName;
+      document
+        .getElementById(
+          'declineModal'
+        )
+        .style.display = 'flex';
+    }
 
 
-      document.getElementById(
-          'declineReason'
-        ).value =
-        '';
+    function closeDeclineModal() {
 
+      document
+        .getElementById(
+          'declineModal'
+        )
+        .style.display = 'none';
 
-      openModal(
-        'declineModal'
-      );
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | CLOSE MODAL OUTSIDE CLICK
+    | CLOSE MODALS WHEN CLICKING OUTSIDE
     |--------------------------------------------------------------------------
     */
 
-    document.addEventListener(
-      'click',
-      function(event) {
+    window.onclick = function(event) {
 
-        if (
-          event.target.classList.contains(
-            'modal'
-          )
-        ) {
-
-          event.target.classList.remove(
-            'show'
-          );
-
-        }
-
-      }
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ESCAPE KEY
-    |--------------------------------------------------------------------------
-    */
-
-    document.addEventListener(
-      'keydown',
-      function(event) {
-
-        if (
-          event.key === 'Escape'
-        ) {
-
-          document
-            .querySelectorAll(
-              '.modal.show'
-            )
-            .forEach(
-              modal =>
-              modal.classList.remove(
-                'show'
-              )
-            );
-
-        }
-
-      }
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | LIVE DATE AND TIME
-    |--------------------------------------------------------------------------
-    */
-
-    function updateDateTime() {
-
-      const now =
-        new Date();
-
-
-      const options = {
-
-        weekday: 'short',
-
-        year: 'numeric',
-
-        month: 'short',
-
-        day: 'numeric',
-
-        hour: '2-digit',
-
-        minute: '2-digit',
-
-        second: '2-digit'
-
-      };
-
-
-      const element =
+      const addModal =
         document.getElementById(
-          'datetime'
+          'addDogModal'
+        );
+
+      const editModal =
+        document.getElementById(
+          'editDogModal'
+        );
+
+      const declineModal =
+        document.getElementById(
+          'declineModal'
         );
 
 
-      if (element) {
+      if (event.target === addModal) {
 
-        element.textContent =
-          now.toLocaleString(
-            'en-US',
-            options
-          );
+        closeAddDogModal();
 
       }
-    }
 
 
-    updateDateTime();
+      if (event.target === editModal) {
+
+        closeEditDogModal();
+
+      }
 
 
-    setInterval(
-      updateDateTime,
-      1000
-    );
+      if (event.target === declineModal) {
+
+        closeDeclineModal();
+
+      }
+
+    };
 
 
     /*
     |--------------------------------------------------------------------------
-    | MOBILE SIDEBAR
-    |--------------------------------------------------------------------------
-    */
-
-    function toggleMobileSidebar() {
-
-      const sidebar =
-        document.getElementById(
-          'sidebar'
-        );
-
-
-      if (!sidebar) {
-
-        return;
-
-      }
-
-
-      if (
-        sidebar.style.display ===
-        'block'
-      ) {
-
-        sidebar.style.display =
-          'none';
-
-      } else {
-
-        sidebar.style.display =
-          'block';
-
-        sidebar.style.width =
-          '245px';
-
-        sidebar.style.zIndex =
-          '2000';
-
-      }
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | NAVIGATION
+    | ACTIVE NAVIGATION
     |--------------------------------------------------------------------------
     */
 
     document
-      .querySelectorAll(
-        '.nav-link'
-      )
-      .forEach(
-        link => {
+      .querySelectorAll('.nav-link')
+      .forEach(function(link) {
 
-          link.addEventListener(
-            'click',
-            function() {
+        link.addEventListener(
+          'click',
+          function() {
 
-              document
-                .querySelectorAll(
-                  '.nav-link'
-                )
-                .forEach(
-                  item =>
-                  item.classList.remove(
-                    'active'
-                  )
-                );
+            document
+              .querySelectorAll(
+                '.nav-link'
+              )
+              .forEach(function(item) {
 
-
-              if (
-                this.getAttribute(
-                  'href'
-                ) &&
-                this.getAttribute(
-                  'href'
-                ).startsWith('#')
-              ) {
-
-                this.classList.add(
+                item.classList.remove(
                   'active'
                 );
 
-              }
+              });
+
+
+            if (
+              this.getAttribute('href')
+              .startsWith('#')
+            ) {
+
+              this.classList.add(
+                'active'
+              );
 
             }
-          );
 
-        }
-      );
+          }
+        );
+
+      });
 
 
     /*
     |--------------------------------------------------------------------------
-    | CHAT NOTIFICATION SYSTEM
+    | CHAT NOTIFICATION POLLING
     |--------------------------------------------------------------------------
     |
-    | IMPORTANT:
-    | The initial unread count comes from PHP.
+    | Keeps Chat Support notification updated.
     |
-    | If current count = 2
-    | and new count = 2
-    | -> NO SOUND
-    | -> NO POPUP
-    |
-    | If user sends another message:
-    | current count = 2
-    | new count = 3
-    | -> SOUND
-    | -> POPUP
-    | -> BADGE = 3
-    |
-    |--------------------------------------------------------------------------
     */
 
-    let currentUnreadChatCount =
-      <?php echo $unreadChatCount; ?>;
-
-
-    let chatPopupTimer = null;
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PLAY CHAT NOTIFICATION SOUND
-    |--------------------------------------------------------------------------
-    */
-
-    function playChatNotificationSound() {
-
-      try {
-
-        const AudioContext =
-          window.AudioContext ||
-          window.webkitAudioContext;
-
-
-        if (!AudioContext) {
-
-          return;
-
-        }
-
-
-        const audioContext =
-          new AudioContext();
-
-
-        const oscillator =
-          audioContext.createOscillator();
-
-
-        const gainNode =
-          audioContext.createGain();
-
-
-        oscillator.type =
-          'sine';
-
-
-        /*
-        | First tone
-        */
-
-        oscillator.frequency.setValueAtTime(
-          880,
-          audioContext.currentTime
-        );
-
-
-        /*
-        | Second tone
-        */
-
-        oscillator.frequency.setValueAtTime(
-          660,
-          audioContext.currentTime + 0.12
-        );
-
-
-        /*
-        | Volume
-        */
-
-        gainNode.gain.setValueAtTime(
-          0.001,
-          audioContext.currentTime
-        );
-
-
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.25,
-          audioContext.currentTime + 0.02
-        );
-
-
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.001,
-          audioContext.currentTime + 0.35
-        );
-
-
-        oscillator.connect(
-          gainNode
-        );
-
-
-        gainNode.connect(
-          audioContext.destination
-        );
-
-
-        oscillator.start();
-
-
-        oscillator.stop(
-          audioContext.currentTime + 0.35
-        );
-
-
-      } catch (error) {
-
-        console.log(
-          'Chat sound error:',
-          error
-        );
-
-      }
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW CHAT POPUP
-    |--------------------------------------------------------------------------
-    */
-
-    function showChatPopup() {
-
-      const popup =
-        document.getElementById(
-          'chatPopupNotification'
-        );
-
-
-      if (!popup) {
-
-        return;
-
-      }
-
-
-      popup.style.display =
-        'flex';
-
-
-      /*
-      | Play sound ONLY for a new message
-      */
-
-      playChatNotificationSound();
-
-
-      /*
-      | Remove previous timer
-      */
-
-      clearTimeout(
-        chatPopupTimer
-      );
-
-
-      /*
-      | Hide popup after 6 seconds
-      */
-
-      chatPopupTimer =
-        setTimeout(
-          function() {
-
-            closeChatPopup();
-
-          },
-          6000
-        );
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CLOSE CHAT POPUP
-    |--------------------------------------------------------------------------
-    */
-
-    function closeChatPopup() {
-
-      const popup =
-        document.getElementById(
-          'chatPopupNotification'
-        );
-
-
-      if (popup) {
-
-        popup.style.display =
-          'none';
-
-      }
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHECK NEW CHAT MESSAGES
-    |--------------------------------------------------------------------------
-    */
-
-    function checkNewChatMessages() {
+    function checkChatNotifications() {
 
       fetch(
           'chat_notification.php', {
@@ -3533,163 +3023,87 @@ function getValidImagePath($imagePath)
           }
         )
 
-        .then(
-          function(response) {
+        .then(function(response) {
 
-            if (!response.ok) {
+          return response.json();
 
-              throw new Error(
-                'Notification request failed'
-              );
+        })
 
-            }
+        .then(function(data) {
 
-
-            return response.json();
-
-          }
-        )
-
-        .then(
-          function(data) {
-
-            if (!data.success) {
-
-              return;
-
-            }
-
-
-            const newCount =
-              parseInt(
-                data.unread_count || 0
-              );
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | UPDATE SIDEBAR BADGE
-            |--------------------------------------------------------------------------
-            */
-
-            const chatLink =
-              document.querySelector(
-                '.chat-nav-link'
-              );
-
-
-            if (chatLink) {
-
-              let badge =
-                chatLink.querySelector(
-                  '.chat-notification'
-                );
-
-
-              /*
-              | If unread messages exist
-              */
-
-              if (newCount > 0) {
-
-                /*
-                | Create badge if it does not exist
-                */
-
-                if (!badge) {
-
-                  badge =
-                    document.createElement(
-                      'span'
-                    );
-
-
-                  badge.className =
-                    'chat-notification';
-
-
-                  chatLink.appendChild(
-                    badge
-                  );
-
-                }
-
-
-                badge.textContent =
-                  newCount;
-
-              }
-
-
-              /*
-              | If there are no unread messages
-              */
-              else {
-
-                if (badge) {
-
-                  badge.remove();
-
-                }
-
-              }
-
-            }
-
-
-            /*
-            |--------------------------------------------------------------------------
-            | NEW MESSAGE DETECTION
-            |--------------------------------------------------------------------------
-            |
-            | This is the important part.
-            |
-            | Sound + popup only happen when
-            | unread count INCREASES.
-            |
-            */
-
-            if (
-              newCount >
-              currentUnreadChatCount
-            ) {
-
-              showChatPopup();
-
-            }
-
-
-            /*
-            | Save latest count
-            */
-
-            currentUnreadChatCount =
-              newCount;
-
-          }
-        )
-
-        .catch(
-          function(error) {
-
-            console.log(
-              'Chat notification error:',
-              error
+          const chatLink =
+            document.querySelector(
+              '.chat-nav-link'
             );
 
+          if (!chatLink) {
+            return;
           }
-        );
+
+
+          let badge =
+            chatLink.querySelector(
+              '.chat-notification'
+            );
+
+
+          const count =
+            parseInt(
+              data.count || 0
+            );
+
+
+          if (count > 0) {
+
+            if (!badge) {
+
+              badge =
+                document.createElement(
+                  'span'
+                );
+
+              badge.className =
+                'chat-notification';
+
+              chatLink.appendChild(
+                badge
+              );
+            }
+
+
+            badge.textContent =
+              count;
+
+          } else {
+
+            if (badge) {
+
+              badge.remove();
+
+            }
+
+          }
+
+        })
+
+        .catch(function(error) {
+
+          console.log(
+            'Chat notification error:',
+            error
+          );
+
+        });
+
     }
 
 
     /*
-    |--------------------------------------------------------------------------
-    | CHECK EVERY 5 SECONDS
-    |--------------------------------------------------------------------------
+    | Check every 5 seconds
     */
 
     setInterval(
-      checkNewChatMessages,
+      checkChatNotifications,
       5000
     );
   </script>
