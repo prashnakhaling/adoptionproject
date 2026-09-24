@@ -21,7 +21,7 @@ require_once __DIR__ . '/PHPMailer/src/SMTP.php';
    GMAIL CONFIGURATION
    ========================================================= */
 $mailUsername = "happytailsnepal@gmail.com";
-$mailPassword = "YOUR_GMAIL_APP_PASSWORD";
+$mailPassword = "avovnrqcuhnkcvkd";
 $mailFromName = "Happy Tails";
 
 

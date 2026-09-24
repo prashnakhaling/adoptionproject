@@ -9,17 +9,9 @@ require_once __DIR__ . '/admin/dataconnection.php';
 
 $errors = [];
 
-// Sign Up form should appear first
 $activeSignup = true;
-
-
-/* --------------------------------
-   PROCESS LOGIN
--------------------------------- */
-
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 
-    // Login form active
     $activeSignup = false;
 
     $username = trim($_POST['login_username'] ?? '');
@@ -27,40 +19,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 
     $loginErrors = [];
 
-
-    /* -----------------------------
-       USERNAME VALIDATION
-    ----------------------------- */
-
     if ($username === '') {
 
         $loginErrors['login_username'] =
             "Username is required.";
     }
 
-
-    /* -----------------------------
-       PASSWORD VALIDATION
-    ----------------------------- */
-
     if ($password === '') {
 
         $loginErrors['login_password'] =
             "Password is required.";
     }
-
-
-    /* -----------------------------
-       CHECK USER FROM DATABASE
-    ----------------------------- */
-
-    /*
-     * Username is checked from
-     * users.name
-     *
-     * No username length validation.
-     */
-
     if ($username !== '') {
 
         $stmt = $conn->prepare(
@@ -76,11 +45,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 
         $result = $stmt->get_result();
 
-
-        /* -----------------------------
-           USER DOES NOT EXIST
-        ----------------------------- */
-
         if ($result->num_rows === 0) {
 
             $loginErrors['login_general'] =
@@ -88,16 +52,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
         } else {
 
             $user = $result->fetch_assoc();
-
-
-            /* -----------------------------
-               CHECK PASSWORD
-            ----------------------------- */
-
-            /*
-             * Only check password when
-             * password field is not empty.
-             */
 
             if ($password !== '') {
 
@@ -111,11 +65,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
                     $loginErrors['login_general'] =
                         "Incorrect password.";
                 } else {
-
-                    /* -----------------------------
-                       LOGIN SUCCESS
-                    ----------------------------- */
-
                     $_SESSION['logged_in'] = true;
 
                     $_SESSION['user_name'] =
@@ -123,11 +72,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 
                     $_SESSION['user_email'] =
                         $user['email'];
-
-
-                    /* -----------------------------
-                       REDIRECT TO USER DASHBOARD
-                    ----------------------------- */
 
                     header(
                         "Location: http://adoptionproject.loc/userdashboard.php"
@@ -140,11 +84,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
 
         $stmt->close();
     }
-
-
-    /* -----------------------------
-       SAVE LOGIN ERRORS
-    ----------------------------- */
 
     if (!empty($loginErrors)) {
 
@@ -164,11 +103,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['login'])) {
     }
 }
 
-
-/* --------------------------------
-   PROCESS SIGN UP
--------------------------------- */
-
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup'])) {
 
     $activeSignup = true;
@@ -176,9 +110,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup'])) {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-
-
-    // NAME VALIDATION
 
     if ($name === '') {
 

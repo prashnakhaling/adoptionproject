@@ -13,11 +13,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['signup'])) {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
-
-    // =========================
-    // NAME VALIDATION
-    // =========================
-
     if ($name === '') {
 
         $errors['name'] = "Name is required.";
