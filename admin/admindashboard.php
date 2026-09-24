@@ -44,6 +44,17 @@ require __DIR__ . '/../PHPMailer/src/SMTP.php';
 require_once __DIR__ . '/dataconnection.php';
 
 
+/* Ensure dog size and gender columns exist */
+$sizeColumnCheck = $conn->query("SHOW COLUMNS FROM dogs LIKE 'size'");
+if ($sizeColumnCheck && $sizeColumnCheck->num_rows === 0) {
+  $conn->query("ALTER TABLE dogs ADD COLUMN size VARCHAR(50) NULL AFTER age");
+}
+$genderColumnCheck = $conn->query("SHOW COLUMNS FROM dogs LIKE 'gender'");
+if ($genderColumnCheck && $genderColumnCheck->num_rows === 0) {
+  $conn->query("ALTER TABLE dogs ADD COLUMN gender VARCHAR(20) NULL AFTER size");
+}
+
+
 /*
 |--------------------------------------------------------------------------
 | HELPER
@@ -1197,6 +1208,87 @@ if ($result) {
 }
 
 
+
+/*
+|--------------------------------------------------------------------------
+| ADD DOG
+|--------------------------------------------------------------------------
+*/
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_dog'])) {
+  $dogBreed = trim($_POST['dog_breed'] ?? '');
+  $age = trim($_POST['age'] ?? '');
+  $size = trim($_POST['size'] ?? '');
+  $gender = trim($_POST['gender'] ?? '');
+  $description = trim($_POST['description'] ?? '');
+  $dogImage = basename(trim($_POST['dog_image'] ?? ''));
+
+  $allowedSizes = ['Small', 'Medium', 'Large'];
+  $allowedGenders = ['Male', 'Female'];
+
+  if ($dogBreed === '' || $age === '' || $size === '' || $gender === '' || $description === '' || $dogImage === '') {
+    die('Please fill all dog fields.');
+  }
+  if (!in_array($size, $allowedSizes, true)) die('Invalid dog size.');
+  if (!in_array($gender, $allowedGenders, true)) die('Invalid dog gender.');
+
+  $imagePath = __DIR__ . '/../assets/images/' . $dogImage;
+  if (!file_exists($imagePath)) die('Selected dog image was not found.');
+
+  $stmt = $conn->prepare("INSERT INTO dogs (dog_breed, age, size, gender, dog_image, description) VALUES (?, ?, ?, ?, ?, ?)");
+  if (!$stmt) die('Database error: ' . $conn->error);
+  $stmt->bind_param('ssssss', $dogBreed, $age, $size, $gender, $dogImage, $description);
+
+  if (!$stmt->execute()) {
+    $error = $stmt->error;
+    $stmt->close();
+    die('Unable to add dog: ' . $error);
+  }
+  $stmt->close();
+  header('Location: admindashboard.php#dogs');
+  exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| EDIT DOG
+|--------------------------------------------------------------------------
+*/
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_dog'])) {
+  $dogId = (int)($_POST['dog_id'] ?? 0);
+  $dogBreed = trim($_POST['dog_breed'] ?? '');
+  $age = trim($_POST['age'] ?? '');
+  $size = trim($_POST['size'] ?? '');
+  $gender = trim($_POST['gender'] ?? '');
+  $description = trim($_POST['description'] ?? '');
+  $dogImage = basename(trim($_POST['dog_image'] ?? ''));
+
+  $allowedSizes = ['Small', 'Medium', 'Large'];
+  $allowedGenders = ['Male', 'Female'];
+
+  if ($dogId <= 0) die('Invalid dog ID.');
+  if ($dogBreed === '' || $age === '' || $size === '' || $gender === '' || $description === '' || $dogImage === '') {
+    die('Please fill all dog fields.');
+  }
+  if (!in_array($size, $allowedSizes, true)) die('Invalid dog size.');
+  if (!in_array($gender, $allowedGenders, true)) die('Invalid dog gender.');
+
+  $imagePath = __DIR__ . '/../assets/images/' . $dogImage;
+  if (!file_exists($imagePath)) die('Selected dog image was not found.');
+
+  $stmt = $conn->prepare("UPDATE dogs SET dog_breed = ?, age = ?, size = ?, gender = ?, dog_image = ?, description = ? WHERE dog_id = ?");
+  if (!$stmt) die('Database error: ' . $conn->error);
+  $stmt->bind_param('ssssssi', $dogBreed, $age, $size, $gender, $dogImage, $description, $dogId);
+
+  if (!$stmt->execute()) {
+    $error = $stmt->error;
+    $stmt->close();
+    die('Unable to update dog: ' . $error);
+  }
+  $stmt->close();
+  header('Location: admindashboard.php#dogs');
+  exit;
+}
+
 /*
 |--------------------------------------------------------------------------
 | GET DOGS
@@ -1210,6 +1302,8 @@ $dogResult = $conn->query("
         dog_id,
         dog_breed,
         age,
+        size,
+        gender,
         dog_image,
         added_date,
         description
@@ -2350,6 +2444,14 @@ if ($storyResult) {
               </th>
 
               <th>
+                Size
+              </th>
+
+              <th>
+                Gender
+              </th>
+
+              <th>
                 Description
               </th>
 
@@ -2360,7 +2462,6 @@ if ($storyResult) {
               <th>
                 Action
               </th>
-
             </tr>
 
           </thead>
@@ -2373,7 +2474,7 @@ if ($storyResult) {
               <tr>
 
                 <td
-                  colspan="6"
+                  colspan="8"
                   style="text-align:center;">
 
                   No dogs found.
@@ -2426,6 +2527,16 @@ if ($storyResult) {
                   </td>
 
 
+
+
+                  <td>
+                    <?php echo e($dog['size'] ?? 'Not specified'); ?>
+                  </td>
+
+                  <td>
+                    <?php echo e($dog['gender'] ?? 'Not specified'); ?>
+                  </td>
+
                   <td>
 
                     <?php
@@ -2455,6 +2566,7 @@ if ($storyResult) {
 
 
                       <button
+                        type="button"
                         class="btn btn-primary"
                         onclick='openEditDogModal(
                                                 <?php
@@ -3325,7 +3437,7 @@ if ($storyResult) {
 
         <form
           method="POST"
-          action="add-dog.php">
+          action="admindashboard.php#dogs">
 
 
           <div class="form-group">
@@ -3354,6 +3466,45 @@ if ($storyResult) {
               type="text"
               name="age"
               required>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Size
+            </label>
+
+            <select
+              name="size"
+              required>
+
+              <option value="">Select Size</option>
+              <option value="Small">Small</option>
+              <option value="Medium">Medium</option>
+              <option value="Large">Large</option>
+
+            </select>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Gender
+            </label>
+
+            <select
+              name="gender"
+              required>
+
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+
+            </select>
 
           </div>
 
@@ -3430,6 +3581,7 @@ if ($storyResult) {
 
           <button
             type="submit"
+            name="add_dog"
             class="btn btn-primary">
 
             Add Dog
@@ -3471,7 +3623,7 @@ if ($storyResult) {
 
         <form
           method="POST"
-          action="edit-dog.php">
+          action="admindashboard.php#dogs">
 
 
           <input
@@ -3508,6 +3660,47 @@ if ($storyResult) {
               name="age"
               id="editDogAge"
               required>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Size
+            </label>
+
+            <select
+              name="size"
+              id="editDogSize"
+              required>
+
+              <option value="">Select Size</option>
+              <option value="Small">Small</option>
+              <option value="Medium">Medium</option>
+              <option value="Large">Large</option>
+
+            </select>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Gender
+            </label>
+
+            <select
+              name="gender"
+              id="editDogGender"
+              required>
+
+              <option value="">Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+
+            </select>
 
           </div>
 
@@ -3585,6 +3778,7 @@ if ($storyResult) {
 
           <button
             type="submit"
+            name="edit_dog"
             class="btn btn-primary">
 
             Update Dog
@@ -3957,6 +4151,18 @@ if ($storyResult) {
           .getElementById('editDogAge')
           .value =
           dog.age || '';
+
+
+        document
+          .getElementById('editDogSize')
+          .value =
+          dog.size || '';
+
+
+        document
+          .getElementById('editDogGender')
+          .value =
+          dog.gender || '';
 
 
         document
