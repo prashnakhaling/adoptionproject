@@ -93,7 +93,13 @@ if (is_dir($imageDirectory)) {
       pathinfo($file, PATHINFO_EXTENSION)
     );
 
-    if (in_array($extension, $imageExtensions, true)) {
+    if (
+      in_array(
+        $extension,
+        $imageExtensions,
+        true
+      )
+    ) {
       $availableImages[] = $file;
     }
   }
@@ -111,12 +117,9 @@ function getImageUrl($image)
   $image = trim((string)$image);
 
   if ($image === '') {
-    return 'assets/images/default-dog.jpg';
+    return '../assets/images/default-dog.jpg';
   }
 
-  /*
-    | If database already contains full relative path
-    */
   if (
     strpos($image, 'assets/images/') === 0 ||
     strpos($image, 'dogpic/') === 0
@@ -124,10 +127,8 @@ function getImageUrl($image)
     return '../' . $image;
   }
 
-  /*
-    | Otherwise image is stored as filename
-    */
-  return '../assets/images/' . rawurlencode($image);
+  return '../assets/images/' .
+    rawurlencode($image);
 }
 
 
@@ -162,9 +163,11 @@ $unreadChatResult = $conn->query("
 
 if ($unreadChatResult) {
 
-  $unreadRow = $unreadChatResult->fetch_assoc();
+  $unreadRow =
+    $unreadChatResult->fetch_assoc();
 
-  $unreadChatCount = (int)($unreadRow['total'] ?? 0);
+  $unreadChatCount =
+    (int)($unreadRow['total'] ?? 0);
 }
 
 
@@ -172,25 +175,28 @@ if ($unreadChatResult) {
 |--------------------------------------------------------------------------
 | EMAIL CONFIGURATION
 |--------------------------------------------------------------------------
-|
-| Use the SAME working Gmail credentials that you used
-| for your submission email.
-|
 */
 
 $mailUsername = "happytailsnepal@gmail.com";
 
-$mailPassword = "avovnrqcuhnkcvkd";
+/*
+|--------------------------------------------------------------------------
+| IMPORTANT
+|--------------------------------------------------------------------------
+| Put your Gmail App Password here.
+| Do NOT use your normal Gmail password.
+|--------------------------------------------------------------------------
+*/
+
+$mailPassword = "YOUR_GMAIL_APP_PASSWORD";
 
 $mailFromName = "Happy Tails";
 
 $shelterLocation =
   "Happy Tails Shelter, Kathmandu — Mon to Sat, 10am to 5pm";
 
-/*
-| Put your real shelter/contact number here.
-*/
-$shelterPhone = "+977-98XXXXXXXX";
+$shelterPhone =
+  "+977-98XXXXXXXX";
 
 
 /*
@@ -215,25 +221,23 @@ function sendApplicationEmail(
     $shelterPhone;
 
 
-  /*
-    | Validate applicant email
-    */
   if (
     empty($toEmail) ||
-    !filter_var($toEmail, FILTER_VALIDATE_EMAIL)
+    !filter_var(
+      $toEmail,
+      FILTER_VALIDATE_EMAIL
+    )
   ) {
 
     error_log(
-      "Invalid applicant email: " . $toEmail
+      "Invalid applicant email: " .
+        $toEmail
     );
 
     return false;
   }
 
 
-  /*
-    | Check Gmail password
-    */
   if (empty($mailPassword)) {
 
     error_log(
@@ -250,18 +254,21 @@ function sendApplicationEmail(
 
 
     /*
-        | SMTP SETTINGS
+        | SMTP
         */
 
     $mail->isSMTP();
 
-    $mail->Host = 'smtp.gmail.com';
+    $mail->Host =
+      'smtp.gmail.com';
 
     $mail->SMTPAuth = true;
 
-    $mail->Username = $mailUsername;
+    $mail->Username =
+      $mailUsername;
 
-    $mail->Password = $mailPassword;
+    $mail->Password =
+      $mailPassword;
 
     $mail->SMTPSecure =
       PHPMailer::ENCRYPTION_STARTTLS;
@@ -290,7 +297,7 @@ function sendApplicationEmail(
 
 
     /*
-        | HTML EMAIL
+        | HTML
         */
 
     $mail->isHTML(true);
@@ -414,10 +421,6 @@ function sendApplicationEmail(
             ";
 
 
-      /*
-            | Plain text version
-            */
-
       $mail->AltBody =
         "Dear {$applicantName},\n\n" .
 
@@ -455,11 +458,6 @@ function sendApplicationEmail(
 
       $safeDogBreed =
         e($dogBreed);
-
-      /*
-            | IMPORTANT:
-            | This is the EXACT reason entered by admin.
-            */
 
       $safeReason =
         htmlspecialchars(
@@ -553,10 +551,6 @@ function sendApplicationEmail(
             ";
 
 
-      /*
-            | Plain text version
-            */
-
       $mail->AltBody =
         "Dear {$applicantName},\n\n" .
 
@@ -577,12 +571,6 @@ function sendApplicationEmail(
         "Happy Tails Shelter";
     }
 
-
-    /*
-        |--------------------------------------------------------------------------
-        | SEND
-        |--------------------------------------------------------------------------
-        */
 
     $mail->send();
 
@@ -611,15 +599,12 @@ if (
 ) {
 
   $applicationId =
-    (int)($_POST['application_id'] ?? 0);
+    (int)(
+      $_POST['application_id'] ?? 0
+    );
 
 
   if ($applicationId > 0) {
-
-    /*
-        | Get applicant information
-        | Email comes from users table.
-        */
 
     $stmt = $conn->prepare("
             SELECT
@@ -654,17 +639,14 @@ if (
 
       if ($app) {
 
-        /*
-                | Update status
-                */
-
-        $updateStmt = $conn->prepare("
-                    UPDATE adoption_applications
-                    SET
-                        status = 'accepted',
-                        decline_reason = NULL
-                    WHERE id = ?
-                ");
+        $updateStmt =
+          $conn->prepare("
+                        UPDATE adoption_applications
+                        SET
+                            status = 'accepted',
+                            decline_reason = NULL
+                        WHERE id = ?
+                    ");
 
 
         if ($updateStmt) {
@@ -679,10 +661,6 @@ if (
           $updateStmt->close();
         }
 
-
-        /*
-                | Send accepted email
-                */
 
         sendApplicationEmail(
 
@@ -699,10 +677,6 @@ if (
     }
   }
 
-
-  /*
-    | Return to applications section
-    */
 
   header(
     "Location: admindashboard.php#applications"
@@ -724,7 +698,9 @@ if (
 ) {
 
   $applicationId =
-    (int)($_POST['application_id'] ?? 0);
+    (int)(
+      $_POST['application_id'] ?? 0
+    );
 
   $declineReason =
     trim(
@@ -736,10 +712,6 @@ if (
     $applicationId > 0 &&
     $declineReason !== ''
   ) {
-
-    /*
-        | Get applicant information
-        */
 
     $stmt = $conn->prepare("
             SELECT
@@ -774,17 +746,14 @@ if (
 
       if ($app) {
 
-        /*
-                | Save exact admin reason
-                */
-
-        $updateStmt = $conn->prepare("
-                    UPDATE adoption_applications
-                    SET
-                        status = 'declined',
-                        decline_reason = ?
-                    WHERE id = ?
-                ");
+        $updateStmt =
+          $conn->prepare("
+                        UPDATE adoption_applications
+                        SET
+                            status = 'declined',
+                            decline_reason = ?
+                        WHERE id = ?
+                    ");
 
 
         if ($updateStmt) {
@@ -800,13 +769,6 @@ if (
           $updateStmt->close();
         }
 
-
-        /*
-                | Send declined email
-                |
-                | The exact reason entered by admin
-                | is passed to the email function.
-                */
 
         sendApplicationEmail(
 
@@ -826,12 +788,310 @@ if (
   }
 
 
-  /*
-    | Return to applications
-    */
-
   header(
     "Location: admindashboard.php#applications"
+  );
+
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| STORY ACTIONS
+|--------------------------------------------------------------------------
+| All story operations are handled in THIS FILE.
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| ADD STORY
+|--------------------------------------------------------------------------
+*/
+
+if (
+  $_SERVER['REQUEST_METHOD'] === 'POST' &&
+  isset($_POST['add_story'])
+) {
+
+  $title =
+    trim(
+      $_POST['title'] ?? ''
+    );
+
+  $description =
+    trim(
+      $_POST['description'] ?? ''
+    );
+
+  $storyImage =
+    trim(
+      $_POST['story_image'] ?? ''
+    );
+
+
+  $storyImage =
+    basename($storyImage);
+
+
+  if (
+    $title !== '' &&
+    $description !== '' &&
+    $storyImage !== ''
+  ) {
+
+    $stmt = $conn->prepare("
+            INSERT INTO stories (
+                title,
+                story_image,
+                description,
+                status
+            )
+            VALUES (?, ?, ?, 'draft')
+        ");
+
+
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "sss",
+        $title,
+        $storyImage,
+        $description
+      );
+
+      $stmt->execute();
+
+      $stmt->close();
+    }
+  }
+
+
+  header(
+    "Location: admindashboard.php#stories"
+  );
+
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| EDIT STORY
+|--------------------------------------------------------------------------
+*/
+
+if (
+  $_SERVER['REQUEST_METHOD'] === 'POST' &&
+  isset($_POST['edit_story'])
+) {
+
+  $storyId =
+    (int)(
+      $_POST['story_id'] ?? 0
+    );
+
+  $title =
+    trim(
+      $_POST['title'] ?? ''
+    );
+
+  $description =
+    trim(
+      $_POST['description'] ?? ''
+    );
+
+  $storyImage =
+    trim(
+      $_POST['story_image'] ?? ''
+    );
+
+
+  $storyImage =
+    basename($storyImage);
+
+
+  if (
+    $storyId > 0 &&
+    $title !== '' &&
+    $description !== '' &&
+    $storyImage !== ''
+  ) {
+
+    $stmt = $conn->prepare("
+            UPDATE stories
+            SET
+                title = ?,
+                story_image = ?,
+                description = ?
+            WHERE story_id = ?
+        ");
+
+
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "sssi",
+        $title,
+        $storyImage,
+        $description,
+        $storyId
+      );
+
+      $stmt->execute();
+
+      $stmt->close();
+    }
+  }
+
+
+  header(
+    "Location: admindashboard.php#stories"
+  );
+
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| PUBLISH STORY
+|--------------------------------------------------------------------------
+*/
+
+if (
+  $_SERVER['REQUEST_METHOD'] === 'POST' &&
+  isset($_POST['publish_story'])
+) {
+
+  $storyId =
+    (int)(
+      $_POST['story_id'] ?? 0
+    );
+
+
+  if ($storyId > 0) {
+
+    $stmt = $conn->prepare("
+            UPDATE stories
+            SET status = 'published'
+            WHERE story_id = ?
+        ");
+
+
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "i",
+        $storyId
+      );
+
+      $stmt->execute();
+
+      $stmt->close();
+    }
+  }
+
+
+  header(
+    "Location: admindashboard.php#stories"
+  );
+
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| ARCHIVE STORY
+|--------------------------------------------------------------------------
+*/
+
+if (
+  $_SERVER['REQUEST_METHOD'] === 'POST' &&
+  isset($_POST['archive_story'])
+) {
+
+  $storyId =
+    (int)(
+      $_POST['story_id'] ?? 0
+    );
+
+
+  if ($storyId > 0) {
+
+    $stmt = $conn->prepare("
+            UPDATE stories
+            SET status = 'archived'
+            WHERE story_id = ?
+        ");
+
+
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "i",
+        $storyId
+      );
+
+      $stmt->execute();
+
+      $stmt->close();
+    }
+  }
+
+
+  header(
+    "Location: admindashboard.php#stories"
+  );
+
+  exit;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| DELETE STORY
+|--------------------------------------------------------------------------
+*/
+
+if (
+  $_SERVER['REQUEST_METHOD'] === 'POST' &&
+  isset($_POST['delete_story'])
+) {
+
+  $storyId =
+    (int)(
+      $_POST['story_id'] ?? 0
+    );
+
+
+  if ($storyId > 0) {
+
+    $stmt = $conn->prepare("
+            DELETE FROM stories
+            WHERE story_id = ?
+        ");
+
+
+    if ($stmt) {
+
+      $stmt->bind_param(
+        "i",
+        $storyId
+      );
+
+      $stmt->execute();
+
+      $stmt->close();
+    }
+  }
+
+
+  header(
+    "Location: admindashboard.php#stories"
   );
 
   exit;
@@ -851,7 +1111,9 @@ $declinedApplications = 0;
 
 
 /*
-| Total dogs
+|--------------------------------------------------------------------------
+| TOTAL DOGS
+|--------------------------------------------------------------------------
 */
 
 $result = $conn->query("
@@ -861,7 +1123,8 @@ $result = $conn->query("
 
 if ($result) {
 
-  $row = $result->fetch_assoc();
+  $row =
+    $result->fetch_assoc();
 
   $totalDogs =
     (int)($row['total'] ?? 0);
@@ -869,7 +1132,9 @@ if ($result) {
 
 
 /*
-| Pending
+|--------------------------------------------------------------------------
+| PENDING
+|--------------------------------------------------------------------------
 */
 
 $result = $conn->query("
@@ -880,7 +1145,8 @@ $result = $conn->query("
 
 if ($result) {
 
-  $row = $result->fetch_assoc();
+  $row =
+    $result->fetch_assoc();
 
   $pendingApplications =
     (int)($row['total'] ?? 0);
@@ -888,7 +1154,9 @@ if ($result) {
 
 
 /*
-| Accepted
+|--------------------------------------------------------------------------
+| ACCEPTED
+|--------------------------------------------------------------------------
 */
 
 $result = $conn->query("
@@ -899,7 +1167,8 @@ $result = $conn->query("
 
 if ($result) {
 
-  $row = $result->fetch_assoc();
+  $row =
+    $result->fetch_assoc();
 
   $acceptedApplications =
     (int)($row['total'] ?? 0);
@@ -907,7 +1176,9 @@ if ($result) {
 
 
 /*
-| Declined
+|--------------------------------------------------------------------------
+| DECLINED
+|--------------------------------------------------------------------------
 */
 
 $result = $conn->query("
@@ -918,7 +1189,8 @@ $result = $conn->query("
 
 if ($result) {
 
-  $row = $result->fetch_assoc();
+  $row =
+    $result->fetch_assoc();
 
   $declinedApplications =
     (int)($row['total'] ?? 0);
@@ -947,7 +1219,10 @@ $dogResult = $conn->query("
 
 if ($dogResult) {
 
-  while ($row = $dogResult->fetch_assoc()) {
+  while (
+    $row =
+    $dogResult->fetch_assoc()
+  ) {
 
     $dogs[] = $row;
   }
@@ -983,9 +1258,44 @@ $applicationResult = $conn->query("
 
 if ($applicationResult) {
 
-  while ($row = $applicationResult->fetch_assoc()) {
+  while (
+    $row =
+    $applicationResult->fetch_assoc()
+  ) {
 
     $applications[] = $row;
+  }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| GET STORIES
+|--------------------------------------------------------------------------
+*/
+
+$stories = [];
+
+$storyResult = $conn->query("
+    SELECT
+        story_id,
+        title,
+        story_image,
+        description,
+        added_date,
+        status
+    FROM stories
+    ORDER BY story_id DESC
+");
+
+if ($storyResult) {
+
+  while (
+    $row =
+    $storyResult->fetch_assoc()
+  ) {
+
+    $stories[] = $row;
   }
 }
 
@@ -1003,7 +1313,9 @@ if ($applicationResult) {
     name="viewport"
     content="width=device-width, initial-scale=1.0">
 
-  <title>Happy Tails - Admin Dashboard</title>
+  <title>
+    Happy Tails - Admin Dashboard
+  </title>
 
 
   <style>
@@ -1011,19 +1323,27 @@ if ($applicationResult) {
       box-sizing: border-box;
     }
 
+
     body {
+
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+
+      font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
       background: #f5f3fa;
+
       color: #333;
     }
 
 
     /*
-|--------------------------------------------------------------------------
-| SIDEBAR
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | SIDEBAR
+        |--------------------------------------------------------------------------
+        */
 
     .sidebar {
 
@@ -1045,12 +1365,14 @@ if ($applicationResult) {
       z-index: 1000;
     }
 
+
     .logo {
 
       text-align: center;
 
       margin-bottom: 30px;
     }
+
 
     .logo img {
 
@@ -1060,6 +1382,7 @@ if ($applicationResult) {
 
       height: auto;
     }
+
 
     .nav-link {
 
@@ -1082,12 +1405,14 @@ if ($applicationResult) {
       transition: 0.3s;
     }
 
+
     .nav-link:hover {
 
       background: #eee9f7;
 
       color: #5a34ae;
     }
+
 
     .nav-link.active {
 
@@ -1098,10 +1423,12 @@ if ($applicationResult) {
       font-weight: bold;
     }
 
+
     .chat-nav-link {
 
       position: relative;
     }
+
 
     .chat-notification {
 
@@ -1128,10 +1455,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| MAIN
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | MAIN
+        |--------------------------------------------------------------------------
+        */
 
     .main {
 
@@ -1141,6 +1468,7 @@ if ($applicationResult) {
 
       min-height: 100vh;
     }
+
 
     .topbar {
 
@@ -1153,6 +1481,7 @@ if ($applicationResult) {
       margin-bottom: 30px;
     }
 
+
     .topbar h1 {
 
       margin: 0;
@@ -1162,10 +1491,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| STAT CARDS
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | STAT CARDS
+        |--------------------------------------------------------------------------
+        */
 
     .stats {
 
@@ -1179,6 +1508,7 @@ if ($applicationResult) {
       margin-bottom: 35px;
     }
 
+
     .stat-card {
 
       background: white;
@@ -1191,6 +1521,7 @@ if ($applicationResult) {
         0 5px 20px rgba(0, 0, 0, 0.06);
     }
 
+
     .stat-card h3 {
 
       margin: 0 0 10px;
@@ -1199,6 +1530,7 @@ if ($applicationResult) {
 
       font-size: 15px;
     }
+
 
     .stat-number {
 
@@ -1211,10 +1543,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| SECTION
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | SECTION
+        |--------------------------------------------------------------------------
+        */
 
     .section {
 
@@ -1230,6 +1562,7 @@ if ($applicationResult) {
         0 5px 20px rgba(0, 0, 0, 0.06);
     }
 
+
     .section-header {
 
       display: flex;
@@ -1241,6 +1574,7 @@ if ($applicationResult) {
       margin-bottom: 20px;
     }
 
+
     .section-header h2 {
 
       margin: 0;
@@ -1250,10 +1584,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| BUTTONS
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | BUTTONS
+        |--------------------------------------------------------------------------
+        */
 
     .btn {
 
@@ -1270,6 +1604,7 @@ if ($applicationResult) {
       transition: 0.3s;
     }
 
+
     .btn-primary {
 
       background: #5a34ae;
@@ -1277,10 +1612,12 @@ if ($applicationResult) {
       color: white;
     }
 
+
     .btn-primary:hover {
 
       background: #48258f;
     }
+
 
     .btn-success {
 
@@ -1289,10 +1626,12 @@ if ($applicationResult) {
       color: white;
     }
 
+
     .btn-success:hover {
 
       background: #247d43;
     }
+
 
     .btn-danger {
 
@@ -1301,10 +1640,12 @@ if ($applicationResult) {
       color: white;
     }
 
+
     .btn-danger:hover {
 
       background: #b93d39;
     }
+
 
     .btn-secondary {
 
@@ -1314,11 +1655,17 @@ if ($applicationResult) {
     }
 
 
+    .btn-secondary:hover {
+
+      background: #666;
+    }
+
+
     /*
-|--------------------------------------------------------------------------
-| TABLE
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | TABLE
+        |--------------------------------------------------------------------------
+        */
 
     .table-container {
 
@@ -1326,6 +1673,7 @@ if ($applicationResult) {
 
       overflow-x: auto;
     }
+
 
     table {
 
@@ -1335,6 +1683,7 @@ if ($applicationResult) {
 
       min-width: 900px;
     }
+
 
     th {
 
@@ -1349,6 +1698,7 @@ if ($applicationResult) {
       font-size: 14px;
     }
 
+
     td {
 
       padding: 13px;
@@ -1359,6 +1709,7 @@ if ($applicationResult) {
 
       font-size: 14px;
     }
+
 
     td img {
 
@@ -1373,10 +1724,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| STATUS
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | STATUS
+        |--------------------------------------------------------------------------
+        */
 
     .status {
 
@@ -1391,6 +1742,7 @@ if ($applicationResult) {
       font-weight: bold;
     }
 
+
     .status-pending {
 
       background: #fff2cc;
@@ -1398,12 +1750,14 @@ if ($applicationResult) {
       color: #9a7100;
     }
 
+
     .status-accepted {
 
       background: #dff4e5;
 
       color: #218838;
     }
+
 
     .status-declined {
 
@@ -1413,11 +1767,35 @@ if ($applicationResult) {
     }
 
 
+    .status-draft {
+
+      background: #eeeeee;
+
+      color: #555;
+    }
+
+
+    .status-published {
+
+      background: #dff4e5;
+
+      color: #218838;
+    }
+
+
+    .status-archived {
+
+      background: #e9ecef;
+
+      color: #6c757d;
+    }
+
+
     /*
-|--------------------------------------------------------------------------
-| ACTION BUTTONS
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | ACTION BUTTONS
+        |--------------------------------------------------------------------------
+        */
 
     .action-buttons {
 
@@ -1429,11 +1807,17 @@ if ($applicationResult) {
     }
 
 
+    .action-buttons form {
+
+      margin: 0;
+    }
+
+
     /*
-|--------------------------------------------------------------------------
-| MODAL
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | MODAL
+        |--------------------------------------------------------------------------
+        */
 
     .modal {
 
@@ -1461,6 +1845,7 @@ if ($applicationResult) {
       padding: 20px;
     }
 
+
     .modal-content {
 
       background: white;
@@ -1480,12 +1865,14 @@ if ($applicationResult) {
       position: relative;
     }
 
+
     .modal-content h2 {
 
       color: #5a34ae;
 
       margin-top: 0;
     }
+
 
     .close {
 
@@ -1504,15 +1891,16 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| FORM
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | FORM
+        |--------------------------------------------------------------------------
+        */
 
     .form-group {
 
       margin-bottom: 17px;
     }
+
 
     .form-group label {
 
@@ -1524,6 +1912,7 @@ if ($applicationResult) {
 
       color: #444;
     }
+
 
     .form-group input,
     .form-group textarea,
@@ -1540,6 +1929,7 @@ if ($applicationResult) {
       font-family: inherit;
     }
 
+
     .form-group textarea {
 
       resize: vertical;
@@ -1549,10 +1939,10 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| IMAGE PICKER
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | IMAGE PICKER
+        |--------------------------------------------------------------------------
+        */
 
     .image-picker {
 
@@ -1566,6 +1956,7 @@ if ($applicationResult) {
       margin-top: 10px;
     }
 
+
     .image-option {
 
       border: 2px solid transparent;
@@ -1576,6 +1967,7 @@ if ($applicationResult) {
 
       overflow: hidden;
     }
+
 
     .image-option img {
 
@@ -1588,6 +1980,7 @@ if ($applicationResult) {
       display: block;
     }
 
+
     .image-option.selected {
 
       border-color: #5a34ae;
@@ -1595,10 +1988,34 @@ if ($applicationResult) {
 
 
     /*
-|--------------------------------------------------------------------------
-| MOBILE
-|--------------------------------------------------------------------------
-*/
+        |--------------------------------------------------------------------------
+        | STORY ACTION AREA
+        |--------------------------------------------------------------------------
+        */
+
+    .story-action-buttons {
+
+      display: flex;
+
+      gap: 7px;
+
+      flex-wrap: wrap;
+
+      min-width: 260px;
+    }
+
+
+    .story-action-buttons form {
+
+      margin: 0;
+    }
+
+
+    /*
+        |--------------------------------------------------------------------------
+        | MOBILE
+        |--------------------------------------------------------------------------
+        */
 
     .mobile-menu {
 
@@ -1625,6 +2042,7 @@ if ($applicationResult) {
         grid-template-columns:
           repeat(2, 1fr);
       }
+
     }
 
 
@@ -1638,11 +2056,13 @@ if ($applicationResult) {
         transition: 0.3s;
       }
 
+
       .sidebar.show {
 
         transform:
           translateX(0);
       }
+
 
       .main {
 
@@ -1651,20 +2071,24 @@ if ($applicationResult) {
         padding: 20px;
       }
 
+
       .mobile-menu {
 
         display: block;
       }
+
 
       .topbar {
 
         gap: 15px;
       }
 
+
       .stats {
 
         grid-template-columns: 1fr;
       }
+
     }
   </style>
 
@@ -1678,7 +2102,10 @@ if ($applicationResult) {
      SIDEBAR
 ========================================================= -->
 
-  <div class="sidebar" id="sidebar">
+  <div
+    class="sidebar"
+    id="sidebar">
+
 
     <div class="logo">
 
@@ -1692,25 +2119,35 @@ if ($applicationResult) {
     <a
       href="#dashboard"
       class="nav-link active">
-      <span>🏠 Dashboard</span>
+
+      <span>
+        🏠 Dashboard
+      </span>
+
     </a>
 
 
     <a
       href="#dogs"
       class="nav-link">
-      <span>🐶 Dogs</span>
+
+      <span>
+        🐶 Dogs
+      </span>
+
     </a>
 
 
     <a
       href="#applications"
       class="nav-link">
-      <span>📋 Applications</span>
+
+      <span>
+        📋 Applications
+      </span>
+
     </a>
 
-
-    <!-- CHAT SUPPORT MUST STAY -->
 
     <a
       href="admin_chat.php"
@@ -1720,9 +2157,11 @@ if ($applicationResult) {
         💬 Chat Support
       </span>
 
+
       <?php if ($unreadChatCount > 0): ?>
 
-        <span class="chat-notification">
+        <span
+          class="chat-notification">
 
           <?php
           echo $unreadChatCount;
@@ -1736,13 +2175,27 @@ if ($applicationResult) {
 
 
     <a
+      href="#stories"
+      class="nav-link">
+
+      <span>
+        📖 Add Stories
+      </span>
+
+    </a>
+
+
+    <a
       href="admin-logout.php"
       class="nav-link">
-      <span>🚪 Logout</span>
+
+      <span>
+        🚪 Logout
+      </span>
+
     </a>
 
   </div>
-
 
 
   <!-- =========================================================
@@ -1757,15 +2210,17 @@ if ($applicationResult) {
       <button
         class="mobile-menu"
         onclick="toggleSidebar()">
+
         ☰ Menu
+
       </button>
+
 
       <h1>
         Happy Tails Admin Dashboard
       </h1>
 
     </div>
-
 
 
     <!-- =====================================================
@@ -1775,6 +2230,7 @@ if ($applicationResult) {
     <div
       class="stats"
       id="dashboard">
+
 
       <div class="stat-card">
 
@@ -1846,7 +2302,6 @@ if ($applicationResult) {
     </div>
 
 
-
     <!-- =====================================================
          DOGS
     ====================================================== -->
@@ -1855,16 +2310,20 @@ if ($applicationResult) {
       class="section"
       id="dogs">
 
+
       <div class="section-header">
 
         <h2>
           Available Dogs
         </h2>
 
+
         <button
           class="btn btn-primary"
           onclick="openAddDogModal()">
+
           + Add Dog
+
         </button>
 
       </div>
@@ -1916,7 +2375,9 @@ if ($applicationResult) {
                 <td
                   colspan="6"
                   style="text-align:center;">
+
                   No dogs found.
+
                 </td>
 
               </tr>
@@ -1926,6 +2387,7 @@ if ($applicationResult) {
               <?php foreach ($dogs as $dog): ?>
 
                 <tr>
+
 
                   <td>
 
@@ -1991,20 +2453,23 @@ if ($applicationResult) {
                     <div
                       class="action-buttons">
 
+
                       <button
                         class="btn btn-primary"
                         onclick='openEditDogModal(
-                                        <?php
-                                        echo json_encode(
-                                          $dog,
-                                          JSON_HEX_TAG |
-                                            JSON_HEX_APOS |
-                                            JSON_HEX_QUOT |
-                                            JSON_HEX_AMP
-                                        );
-                                        ?>
-                                    )'>
+                                                <?php
+                                                echo json_encode(
+                                                  $dog,
+                                                  JSON_HEX_TAG |
+                                                    JSON_HEX_APOS |
+                                                    JSON_HEX_QUOT |
+                                                    JSON_HEX_AMP
+                                                );
+                                                ?>
+                                            )'>
+
                         Edit
+
                       </button>
 
 
@@ -2012,25 +2477,30 @@ if ($applicationResult) {
                         method="POST"
                         action="delete-dog.php"
                         onsubmit="
-                                        return confirm(
-                                            'Are you sure you want to delete this dog?'
-                                        );
-                                    ">
+                                                return confirm(
+                                                    'Are you sure you want to delete this dog?'
+                                                );
+                                            ">
 
                         <input
                           type="hidden"
                           name="dog_id"
                           value="<?php
-                                  echo (int)$dog['dog_id'];
+                                  echo (int)
+                                  $dog['dog_id'];
                                   ?>">
+
 
                         <button
                           type="submit"
                           class="btn btn-danger">
+
                           Delete
+
                         </button>
 
                       </form>
+
 
                     </div>
 
@@ -2051,7 +2521,6 @@ if ($applicationResult) {
     </div>
 
 
-
     <!-- =====================================================
          APPLICATIONS
     ====================================================== -->
@@ -2059,6 +2528,7 @@ if ($applicationResult) {
     <div
       class="section"
       id="applications">
+
 
       <div class="section-header">
 
@@ -2106,6 +2576,10 @@ if ($applicationResult) {
               </th>
 
               <th>
+                Date
+              </th>
+
+              <th>
                 Action
               </th>
 
@@ -2121,32 +2595,30 @@ if ($applicationResult) {
               <tr>
 
                 <td
-                  colspan="8"
+                  colspan="9"
                   style="text-align:center;">
+
                   No applications found.
+
                 </td>
 
               </tr>
 
             <?php else: ?>
 
-              <?php foreach (
-                $applications as $application
-              ): ?>
+
+              <?php foreach ($applications as $application): ?>
 
                 <tr>
 
+
                   <td>
 
-                    <strong>
-
-                      <?php
-                      echo e(
-                        $application['owner_name']
-                      );
-                      ?>
-
-                    </strong>
+                    <?php
+                    echo e(
+                      $application['owner_name']
+                    );
+                    ?>
 
                   </td>
 
@@ -2208,26 +2680,18 @@ if ($applicationResult) {
 
                   <td>
 
-                    <?php
-
-                    $status =
-                      strtolower(
-                        $application['status'] ?? 'pending'
-                      );
-
-                    ?>
-
                     <span
-                      class="
-                                    status
-                                    status-<?php
-                                            echo e($status);
-                                            ?>
-                                ">
+                      class="status status-<?php
+                                            echo e(
+                                              $application['status']
+                                            );
+                                            ?>">
 
                       <?php
                       echo ucfirst(
-                        e($status)
+                        e(
+                          $application['status']
+                        )
                       );
                       ?>
 
@@ -2235,16 +2699,17 @@ if ($applicationResult) {
 
 
                     <?php if (
-                      $status === 'declined' &&
+                      $application['status'] ===
+                      'declined' &&
                       !empty($application['decline_reason'])
                     ): ?>
 
                       <div
                         style="
-                                        margin-top:8px;
-                                        font-size:12px;
-                                        color:#c0392b;
-                                    ">
+                                                margin-top:8px;
+                                                color:#c0392b;
+                                                font-size:12px;
+                                            ">
 
                         <strong>
                           Reason:
@@ -2265,14 +2730,28 @@ if ($applicationResult) {
 
                   <td>
 
-                    <?php if (
-                      $status === 'pending'
-                    ): ?>
+                    <?php
+                    echo e(
+                      $application['created_at']
+                    );
+                    ?>
+
+                  </td>
+
+
+                  <td>
+
+                    <?php
+                    if (
+                      $application['status'] ===
+                      'pending'
+                    ):
+                    ?>
+
 
                       <div
                         class="action-buttons">
 
-                        <!-- ACCEPT -->
 
                         <form
                           method="POST"
@@ -2286,47 +2765,53 @@ if ($applicationResult) {
                                     $application['id'];
                                     ?>">
 
+
                           <button
                             type="submit"
                             name="accept_application"
                             class="btn btn-success"
                             onclick="
-                                                return confirm(
-                                                    'Accept this application? The applicant will receive an email.'
-                                                );
-                                            ">
+                                                        return confirm(
+                                                            'Accept this adoption application?'
+                                                        );
+                                                    ">
+
                             Accept
+
                           </button>
 
                         </form>
 
 
-                        <!-- DECLINE -->
-
                         <button
                           type="button"
                           class="btn btn-danger"
                           onclick="
-                                            openDeclineModal(
-                                                <?php
-                                                echo (int)
-                                                $application['id'];
-                                                ?>
-                                            )
-                                        ">
+                                                    openDeclineModal(
+                                                        <?php
+                                                        echo (int)
+                                                        $application['id'];
+                                                        ?>
+                                                    );
+                                                ">
+
                           Decline
+
                         </button>
 
                       </div>
+
 
                     <?php else: ?>
 
                       <span
                         style="
-                                        color:#777;
-                                        font-size:13px;
-                                    ">
+                                                color:#777;
+                                                font-size:13px;
+                                            ">
+
                         No action
+
                       </span>
 
                     <?php endif; ?>
@@ -2347,766 +2832,1686 @@ if ($applicationResult) {
 
     </div>
 
-  </div>
 
+    <!-- =====================================================
+         STORIES
+    ====================================================== -->
 
+    <div
+      class="section"
+      id="stories">
 
-  <!-- =========================================================
-     ADD DOG MODAL
-========================================================= -->
 
-  <div
-    class="modal"
-    id="addDogModal">
+      <div class="section-header">
 
-    <div class="modal-content">
+        <h2>
+          Stories
+        </h2>
 
-      <span
-        class="close"
-        onclick="closeAddDogModal()">
-        &times;
-      </span>
+      </div>
 
 
-      <h2>
-        Add New Dog
-      </h2>
-
-
-      <form
-        method="POST"
-        action="add-dog.php">
-
-        <div class="form-group">
-
-          <label>
-            Dog Breed
-          </label>
-
-          <input
-            type="text"
-            name="dog_breed"
-            required>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Age
-          </label>
-
-          <input
-            type="text"
-            name="age"
-            required>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Description
-          </label>
-
-          <textarea
-            name="description"
-            required></textarea>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Choose Dog Image
-          </label>
-
-
-          <input
-            type="hidden"
-            name="dog_image"
-            id="addDogImage"
-            required>
-
-
-          <div class="image-picker">
-
-            <?php foreach (
-              $availableImages as $image
-            ): ?>
-
-              <div
-                class="image-option"
-                onclick="
-                                selectAddImage(
-                                    this,
-                                    <?php
-                                    echo json_encode($image);
-                                    ?>
-                                )
-                            ">
-
-                <img
-                  src="<?php
-                        echo e(
-                          '../assets/images/' .
-                            rawurlencode($image)
-                        );
-                        ?>"
-                  alt="">
-
-              </div>
-
-            <?php endforeach; ?>
-
-          </div>
-
-        </div>
-
-
-        <button
-          type="submit"
-          class="btn btn-primary">
-          Add Dog
-        </button>
-
-      </form>
-
-    </div>
-
-  </div>
-
-
-
-  <!-- =========================================================
-     EDIT DOG MODAL
-========================================================= -->
-
-  <div
-    class="modal"
-    id="editDogModal">
-
-    <div class="modal-content">
-
-      <span
-        class="close"
-        onclick="closeEditDogModal()">
-        &times;
-      </span>
-
-
-      <h2>
-        Edit Dog
-      </h2>
-
-
-      <form
-        method="POST"
-        action="edit-dog.php">
-
-        <input
-          type="hidden"
-          name="dog_id"
-          id="editDogId">
-
-
-        <div class="form-group">
-
-          <label>
-            Dog Breed
-          </label>
-
-          <input
-            type="text"
-            name="dog_breed"
-            id="editDogBreed"
-            required>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Age
-          </label>
-
-          <input
-            type="text"
-            name="age"
-            id="editDogAge"
-            required>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Description
-          </label>
-
-          <textarea
-            name="description"
-            id="editDogDescription"
-            required></textarea>
-
-        </div>
-
-
-        <div class="form-group">
-
-          <label>
-            Choose Dog Image
-          </label>
-
-
-          <input
-            type="hidden"
-            name="dog_image"
-            id="editDogImage"
-            required>
-
-
-          <div class="image-picker">
-
-            <?php foreach (
-              $availableImages as $image
-            ): ?>
-
-              <div
-                class="image-option edit-image-option"
-                data-image="<?php
-                            echo e($image);
-                            ?>"
-                onclick="
-                                selectEditImage(
-                                    this,
-                                    <?php
-                                    echo json_encode($image);
-                                    ?>
-                                )
-                            ">
-
-                <img
-                  src="<?php
-                        echo e(
-                          '../assets/images/' .
-                            rawurlencode($image)
-                        );
-                        ?>"
-                  alt="">
-
-              </div>
-
-            <?php endforeach; ?>
-
-          </div>
-
-        </div>
-
-
-        <button
-          type="submit"
-          class="btn btn-primary">
-          Update Dog
-        </button>
-
-      </form>
-
-    </div>
-
-  </div>
-
-
-
-  <!-- =========================================================
-     DECLINE MODAL
-========================================================= -->
-
-  <div
-    class="modal"
-    id="declineModal">
-
-    <div class="modal-content">
-
-      <span
-        class="close"
-        onclick="closeDeclineModal()">
-        &times;
-      </span>
-
-
-      <h2>
-        Decline Application
-      </h2>
-
-
-      <p>
-        Please enter the reason for declining
-        this application.
-      </p>
-
+      <!-- =================================================
+             ADD STORY
+        ================================================== -->
 
       <form
         method="POST"
         action="">
 
+
         <input
           type="hidden"
-          name="application_id"
-          id="declineApplicationId">
+          name="add_story"
+          value="1">
 
+
+        <!-- STORY TITLE -->
 
         <div class="form-group">
 
           <label>
-            Reason for Decline
+            Story Title
           </label>
 
-          <textarea
-            name="decline_reason"
+
+          <input
+            type="text"
+            name="title"
             required
-            placeholder="Enter the reason..."></textarea>
+            maxlength="255"
+            placeholder="Enter story title...">
+
+        </div>
+
+
+        <!-- STORY DESCRIPTION -->
+
+        <div class="form-group">
+
+          <label>
+            Story Description
+          </label>
+
+
+          <textarea
+            name="description"
+            required
+            placeholder="Write the story here..."></textarea>
+
+        </div>
+
+
+        <!-- STORY IMAGE -->
+
+        <div class="form-group">
+
+          <label>
+            Choose Story Image
+          </label>
+
+
+          <input
+            type="hidden"
+            name="story_image"
+            id="storyImage"
+            required>
+
+
+          <div class="form-group">
+
+            <label>
+              Story Image
+            </label>
+
+            <input
+              type="file"
+              name="story_image"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              required>
+
+            <small style="color:#777; display:block; margin-top:6px;">
+              <!-- JPG, JPEG, PNG, GIF or WEBP -->
+            </small>
+
+          </div>
 
         </div>
 
 
         <button
           type="submit"
-          name="decline_application"
-          class="btn btn-danger">
-          Decline & Send Email
+          class="btn btn-primary">
+
+          + Add Story
+
         </button>
 
-
-        <button
-          type="button"
-          class="btn btn-secondary"
-          onclick="closeDeclineModal()">
-          Cancel
-        </button>
 
       </form>
 
+
+      <hr
+        style="
+                margin:30px 0;
+                border:none;
+                border-top:1px solid #eee;
+            ">
+
+
+      <!-- =================================================
+             EXISTING STORIES
+        ================================================== -->
+
+      <h3
+        style="
+                color:#5a34ae;
+                margin-bottom:20px;
+            ">
+
+        Added Stories
+
+      </h3>
+
+
+      <div class="table-container">
+
+        <table>
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Image
+              </th>
+
+              <th>
+                Title
+              </th>
+
+              <th>
+                Description
+              </th>
+
+              <th>
+                Status
+              </th>
+
+              <th>
+                Added Date
+              </th>
+
+              <th>
+                Action
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+
+            <?php if (empty($stories)): ?>
+
+              <tr>
+
+                <td
+                  colspan="6"
+                  style="text-align:center;">
+
+                  No stories found.
+
+                </td>
+
+              </tr>
+
+
+            <?php else: ?>
+
+
+              <?php foreach ($stories as $story): ?>
+
+                <tr>
+
+
+                  <!-- IMAGE -->
+
+                  <td>
+
+                    <img
+                      src="<?php
+                            echo e(
+                              getImageUrl(
+                                $story['story_image']
+                              )
+                            );
+                            ?>"
+                      alt="Story">
+
+                  </td>
+
+
+                  <!-- TITLE -->
+
+                  <td>
+
+                    <strong
+                      style="
+                                            color:#5a34ae;
+                                            display:block;
+                                            min-width:180px;
+                                        ">
+
+                      <?php
+                      echo e(
+                        $story['title']
+                      );
+                      ?>
+
+                    </strong>
+
+                  </td>
+
+
+                  <!-- DESCRIPTION -->
+
+                  <td
+                    style="
+                                        max-width:500px;
+                                        line-height:1.6;
+                                    ">
+
+                    <?php
+                    echo nl2br(
+                      e(
+                        $story['description']
+                      )
+                    );
+                    ?>
+
+                  </td>
+
+
+                  <!-- STATUS -->
+
+                  <td>
+
+                    <span
+                      class="status status-<?php
+                                            echo e(
+                                              $story['status']
+                                            );
+                                            ?>">
+
+                      <?php
+                      echo ucfirst(
+                        e(
+                          $story['status']
+                        )
+                      );
+                      ?>
+
+                    </span>
+
+                  </td>
+
+
+                  <!-- DATE -->
+
+                  <td>
+
+                    <?php
+                    echo e(
+                      $story['added_date']
+                    );
+                    ?>
+
+                  </td>
+
+
+                  <!-- ACTIONS -->
+
+                  <td>
+
+                    <div
+                      class="story-action-buttons">
+
+
+                      <!-- EDIT -->
+
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        onclick='openEditStoryModal(
+                                                <?php
+                                                echo json_encode(
+                                                  $story,
+                                                  JSON_HEX_TAG |
+                                                    JSON_HEX_APOS |
+                                                    JSON_HEX_QUOT |
+                                                    JSON_HEX_AMP
+                                                );
+                                                ?>
+                                            )'>
+
+                        Edit
+
+                      </button>
+
+
+                      <!-- PUBLISH -->
+
+                      <?php
+                      if (
+                        $story['status'] !==
+                        'published'
+                      ):
+                      ?>
+
+                        <form
+                          method="POST"
+                          action=""
+                          onsubmit="
+                                                    return confirm(
+                                                        'Publish this story?'
+                                                    );
+                                                ">
+
+                          <input
+                            type="hidden"
+                            name="story_id"
+                            value="<?php
+                                    echo (int)
+                                    $story['story_id'];
+                                    ?>">
+
+
+                          <button
+                            type="submit"
+                            name="publish_story"
+                            class="btn btn-success">
+
+                            Publish
+
+                          </button>
+
+                        </form>
+
+                      <?php endif; ?>
+
+
+                      <!-- ARCHIVE -->
+
+                      <?php
+                      if (
+                        $story['status'] !==
+                        'archived'
+                      ):
+                      ?>
+
+                        <form
+                          method="POST"
+                          action=""
+                          onsubmit="
+                                                    return confirm(
+                                                        'Archive this story?'
+                                                    );
+                                                ">
+
+                          <input
+                            type="hidden"
+                            name="story_id"
+                            value="<?php
+                                    echo (int)
+                                    $story['story_id'];
+                                    ?>">
+
+
+                          <button
+                            type="submit"
+                            name="archive_story"
+                            class="btn btn-secondary">
+
+                            Archive
+
+                          </button>
+
+                        </form>
+
+                      <?php endif; ?>
+
+
+                      <!-- DELETE -->
+
+                      <form
+                        method="POST"
+                        action=""
+                        onsubmit="
+                                                return confirm(
+                                                    'Are you sure you want to permanently delete this story?'
+                                                );
+                                            ">
+
+                        <input
+                          type="hidden"
+                          name="story_id"
+                          value="<?php
+                                  echo (int)
+                                  $story['story_id'];
+                                  ?>">
+
+
+                        <button
+                          type="submit"
+                          name="delete_story"
+                          class="btn btn-danger">
+
+                          Delete
+
+                        </button>
+
+                      </form>
+
+
+                    </div>
+
+                  </td>
+
+                </tr>
+
+              <?php endforeach; ?>
+
+
+            <?php endif; ?>
+
+
+          </tbody>
+
+        </table>
+
+      </div>
+
     </div>
 
-  </div>
+
+    <!-- =========================================================
+         ADD DOG MODAL
+    ========================================================= -->
+
+    <div
+      class="modal"
+      id="addDogModal">
 
 
-
-  <script>
-    /*
-|--------------------------------------------------------------------------
-| SIDEBAR
-|--------------------------------------------------------------------------
-*/
-
-    function toggleSidebar() {
-      document
-        .getElementById('sidebar')
-        .classList.toggle('show');
-    }
+      <div class="modal-content">
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADD DOG MODAL
-    |--------------------------------------------------------------------------
-    */
+        <span
+          class="close"
+          onclick="closeAddDogModal()">
 
-    function openAddDogModal() {
-      document
-        .getElementById('addDogModal')
-        .style.display = 'flex';
-    }
+          &times;
+
+        </span>
 
 
-    function closeAddDogModal() {
-      document
-        .getElementById('addDogModal')
-        .style.display = 'none';
-    }
+        <h2>
+          Add New Dog
+        </h2>
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SELECT ADD IMAGE
-    |--------------------------------------------------------------------------
-    */
-
-    function selectAddImage(element, image) {
-      document
-        .querySelectorAll(
-          '#addDogModal .image-option'
-        )
-        .forEach(function(item) {
-
-          item.classList.remove(
-            'selected'
-          );
-
-        });
+        <form
+          method="POST"
+          action="add-dog.php">
 
 
-      element.classList.add('selected');
+          <div class="form-group">
+
+            <label>
+              Dog Breed
+            </label>
 
 
-      document
-        .getElementById('addDogImage')
-        .value = image;
-    }
+            <input
+              type="text"
+              name="dog_breed"
+              required>
+
+          </div>
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | EDIT DOG MODAL
-    |--------------------------------------------------------------------------
-    */
+          <div class="form-group">
 
-    function openEditDogModal(dog) {
-
-      document
-        .getElementById('editDogModal')
-        .style.display = 'flex';
+            <label>
+              Age
+            </label>
 
 
-      document
-        .getElementById('editDogId')
-        .value = dog.dog_id || '';
+            <input
+              type="text"
+              name="age"
+              required>
+
+          </div>
 
 
-      document
-        .getElementById('editDogBreed')
-        .value = dog.dog_breed || '';
+          <div class="form-group">
+
+            <label>
+              Description
+            </label>
 
 
-      document
-        .getElementById('editDogAge')
-        .value = dog.age || '';
+            <textarea
+              name="description"
+              required></textarea>
+
+          </div>
 
 
-      document
-        .getElementById('editDogDescription')
-        .value = dog.description || '';
+          <div class="form-group">
+
+            <label>
+              Choose Dog Image
+            </label>
+
+
+            <input
+              type="hidden"
+              name="dog_image"
+              id="addDogImage"
+              required>
+
+
+            <div class="image-picker">
+
+
+              <?php foreach (
+                $availableImages
+                as $image
+              ): ?>
+
+
+                <div
+                  class="image-option"
+                  data-image="<?php
+                              echo e($image);
+                              ?>"
+                  onclick="
+                                    selectAddImage(
+                                        this,
+                                        this.dataset.image
+                                    )
+                                ">
+
+
+                  <img
+                    src="<?php
+                          echo e(
+                            '../assets/images/' .
+                              rawurlencode($image)
+                          );
+                          ?>"
+                    alt="">
+
+                </div>
+
+
+              <?php endforeach; ?>
+
+
+            </div>
+
+          </div>
+
+
+          <button
+            type="submit"
+            class="btn btn-primary">
+
+            Add Dog
+
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         EDIT DOG MODAL
+    ========================================================= -->
+
+    <div
+      class="modal"
+      id="editDogModal">
+
+
+      <div class="modal-content">
+
+
+        <span
+          class="close"
+          onclick="closeEditDogModal()">
+
+          &times;
+
+        </span>
+
+
+        <h2>
+          Edit Dog
+        </h2>
+
+
+        <form
+          method="POST"
+          action="edit-dog.php">
+
+
+          <input
+            type="hidden"
+            name="dog_id"
+            id="editDogId">
+
+
+          <div class="form-group">
+
+            <label>
+              Dog Breed
+            </label>
+
+
+            <input
+              type="text"
+              name="dog_breed"
+              id="editDogBreed"
+              required>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Age
+            </label>
+
+
+            <input
+              type="text"
+              name="age"
+              id="editDogAge"
+              required>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Description
+            </label>
+
+
+            <textarea
+              name="description"
+              id="editDogDescription"
+              required></textarea>
+
+          </div>
+
+
+          <div class="form-group">
+
+            <label>
+              Choose Dog Image
+            </label>
+
+
+            <input
+              type="hidden"
+              name="dog_image"
+              id="editDogImage"
+              required>
+
+
+            <div class="image-picker">
+
+
+              <?php foreach (
+                $availableImages
+                as $image
+              ): ?>
+
+
+                <div
+                  class="image-option edit-image-option"
+                  data-image="<?php
+                              echo e($image);
+                              ?>"
+                  onclick="
+                                    selectEditImage(
+                                        this,
+                                        this.dataset.image
+                                    )
+                                ">
+
+
+                  <img
+                    src="<?php
+                          echo e(
+                            '../assets/images/' .
+                              rawurlencode($image)
+                          );
+                          ?>"
+                    alt="">
+
+                </div>
+
+
+              <?php endforeach; ?>
+
+
+            </div>
+
+          </div>
+
+
+          <button
+            type="submit"
+            class="btn btn-primary">
+
+            Update Dog
+
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         EDIT STORY MODAL
+    ========================================================= -->
+
+    <div
+      class="modal"
+      id="editStoryModal">
+
+
+      <div class="modal-content">
+
+
+        <span
+          class="close"
+          onclick="closeEditStoryModal()">
+
+          &times;
+
+        </span>
+
+
+        <h2>
+          Edit Story
+        </h2>
+
+
+        <form
+          method="POST"
+          action="">
+
+
+          <input
+            type="hidden"
+            name="edit_story"
+            value="1">
+
+
+          <input
+            type="hidden"
+            name="story_id"
+            id="editStoryId">
+
+
+          <!-- TITLE -->
+
+          <div class="form-group">
+
+            <label>
+              Story Title
+            </label>
+
+
+            <input
+              type="text"
+              name="title"
+              id="editStoryTitle"
+              maxlength="255"
+              required>
+
+          </div>
+
+
+          <!-- DESCRIPTION -->
+
+          <div class="form-group">
+
+            <label>
+              Story Description
+            </label>
+
+
+            <textarea
+              name="description"
+              id="editStoryDescription"
+              required></textarea>
+
+          </div>
+
+
+          <!-- IMAGE -->
+
+          <div class="form-group">
+
+            <label>
+              Choose Story Image
+            </label>
+
+
+            <input
+              type="hidden"
+              name="story_image"
+              id="editStoryImage"
+              required>
+
+
+            <div class="image-picker">
+
+
+              <?php foreach (
+                $availableImages
+                as $image
+              ): ?>
+
+
+                <div
+                  class="
+                                    image-option
+                                    edit-story-image-option
+                                "
+                  data-image="<?php
+                              echo e($image);
+                              ?>"
+                  onclick="
+                                    selectEditStoryImage(
+                                        this,
+                                        this.dataset.image
+                                    )
+                                ">
+
+
+                  <img
+                    src="<?php
+                          echo e(
+                            '../assets/images/' .
+                              rawurlencode($image)
+                          );
+                          ?>"
+                    alt="Story Image">
+
+                </div>
+
+
+              <?php endforeach; ?>
+
+
+            </div>
+
+          </div>
+
+
+          <button
+            type="submit"
+            class="btn btn-primary">
+
+            Update Story
+
+          </button>
+
+
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick="closeEditStoryModal()">
+
+            Cancel
+
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         DECLINE MODAL
+    ========================================================= -->
+
+    <div
+      class="modal"
+      id="declineModal">
+
+
+      <div class="modal-content">
+
+
+        <span
+          class="close"
+          onclick="closeDeclineModal()">
+
+          &times;
+
+        </span>
+
+
+        <h2>
+          Decline Application
+        </h2>
+
+
+        <p>
+
+          Please enter the reason for declining
+          this application.
+
+        </p>
+
+
+        <form
+          method="POST"
+          action="">
+
+
+          <input
+            type="hidden"
+            name="application_id"
+            id="declineApplicationId">
+
+
+          <div class="form-group">
+
+            <label>
+              Reason for Decline
+            </label>
+
+
+            <textarea
+              name="decline_reason"
+              required
+              placeholder="Enter the reason..."></textarea>
+
+          </div>
+
+
+          <button
+            type="submit"
+            name="decline_application"
+            class="btn btn-danger">
+
+            Decline & Send Email
+
+          </button>
+
+
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick="closeDeclineModal()">
+
+            Cancel
+
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
+
+
+    <script>
+      /*
+        |--------------------------------------------------------------------------
+        | SIDEBAR
+        |--------------------------------------------------------------------------
+        */
+
+      function toggleSidebar() {
+
+        document
+          .getElementById('sidebar')
+          .classList.toggle('show');
+
+      }
 
 
       /*
-      | Convert database image path
-      | to filename
+      |--------------------------------------------------------------------------
+      | ADD DOG MODAL
+      |--------------------------------------------------------------------------
       */
 
-      let imageName =
-        dog.dog_image || '';
+      function openAddDogModal() {
 
-      imageName =
-        imageName
-        .split('/')
-        .pop();
+        document
+          .getElementById('addDogModal')
+          .style.display = 'flex';
+
+      }
 
 
-      document
-        .getElementById('editDogImage')
-        .value = imageName;
+      function closeAddDogModal() {
+
+        document
+          .getElementById('addDogModal')
+          .style.display = 'none';
+
+      }
 
 
       /*
-      | Highlight currently selected image
+      |--------------------------------------------------------------------------
+      | SELECT ADD DOG IMAGE
+      |--------------------------------------------------------------------------
       */
 
-      document
-        .querySelectorAll(
-          '#editDogModal .edit-image-option'
-        )
-        .forEach(function(item) {
+      function selectAddImage(
+        element,
+        image
+      ) {
 
-          item.classList.remove(
-            'selected'
+        document
+          .querySelectorAll(
+            '#addDogModal .image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+            }
           );
+
+
+        element.classList.add(
+          'selected'
+        );
+
+
+        document
+          .getElementById('addDogImage')
+          .value = image;
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | EDIT DOG MODAL
+      |--------------------------------------------------------------------------
+      */
+
+      function openEditDogModal(dog) {
+
+
+        document
+          .getElementById('editDogModal')
+          .style.display = 'flex';
+
+
+        document
+          .getElementById('editDogId')
+          .value =
+          dog.dog_id || '';
+
+
+        document
+          .getElementById('editDogBreed')
+          .value =
+          dog.dog_breed || '';
+
+
+        document
+          .getElementById('editDogAge')
+          .value =
+          dog.age || '';
+
+
+        document
+          .getElementById('editDogDescription')
+          .value =
+          dog.description || '';
+
+
+        let imageName =
+          dog.dog_image || '';
+
+
+        imageName =
+          imageName
+          .split('/')
+          .pop();
+
+
+        document
+          .getElementById('editDogImage')
+          .value =
+          imageName;
+
+
+        document
+          .querySelectorAll(
+            '#editDogModal .edit-image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+
+              if (
+                item.dataset.image ===
+                imageName
+              ) {
+
+                item.classList.add(
+                  'selected'
+                );
+
+              }
+
+            }
+          );
+
+      }
+
+
+      function closeEditDogModal() {
+
+        document
+          .getElementById('editDogModal')
+          .style.display = 'none';
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | SELECT EDIT DOG IMAGE
+      |--------------------------------------------------------------------------
+      */
+
+      function selectEditImage(
+        element,
+        image
+      ) {
+
+        document
+          .querySelectorAll(
+            '#editDogModal .image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+            }
+          );
+
+
+        element.classList.add(
+          'selected'
+        );
+
+
+        document
+          .getElementById('editDogImage')
+          .value =
+          image;
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | EDIT STORY MODAL
+      |--------------------------------------------------------------------------
+      */
+
+      function openEditStoryModal(story) {
+
+
+        document
+          .getElementById('editStoryModal')
+          .style.display = 'flex';
+
+
+        document
+          .getElementById('editStoryId')
+          .value =
+          story.story_id || '';
+
+
+        document
+          .getElementById('editStoryTitle')
+          .value =
+          story.title || '';
+
+
+        document
+          .getElementById('editStoryDescription')
+          .value =
+          story.description || '';
+
+
+        let imageName =
+          story.story_image || '';
+
+
+        imageName =
+          imageName
+          .split('/')
+          .pop();
+
+
+        document
+          .getElementById('editStoryImage')
+          .value =
+          imageName;
+
+
+        document
+          .querySelectorAll(
+            '#editStoryModal .edit-story-image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+
+              if (
+                item.dataset.image ===
+                imageName
+              ) {
+
+                item.classList.add(
+                  'selected'
+                );
+
+              }
+
+            }
+          );
+
+      }
+
+
+      function closeEditStoryModal() {
+
+        document
+          .getElementById('editStoryModal')
+          .style.display = 'none';
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | SELECT EDIT STORY IMAGE
+      |--------------------------------------------------------------------------
+      */
+
+      function selectEditStoryImage(
+        element,
+        image
+      ) {
+
+        document
+          .querySelectorAll(
+            '#editStoryModal .edit-story-image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+            }
+          );
+
+
+        element.classList.add(
+          'selected'
+        );
+
+
+        document
+          .getElementById('editStoryImage')
+          .value =
+          image;
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | DECLINE MODAL
+      |--------------------------------------------------------------------------
+      */
+
+      function openDeclineModal(
+        applicationId
+      ) {
+
+        document
+          .getElementById(
+            'declineApplicationId'
+          )
+          .value =
+          applicationId;
+
+
+        document
+          .getElementById(
+            'declineModal'
+          )
+          .style.display =
+          'flex';
+
+      }
+
+
+      function closeDeclineModal() {
+
+        document
+          .getElementById(
+            'declineModal'
+          )
+          .style.display =
+          'none';
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | STORY IMAGE
+      |--------------------------------------------------------------------------
+      */
+
+      function selectStoryImage(
+        element,
+        image
+      ) {
+
+        document
+          .querySelectorAll(
+            '#stories .story-image-option'
+          )
+          .forEach(
+            function(item) {
+
+              item.classList.remove(
+                'selected'
+              );
+
+            }
+          );
+
+
+        element.classList.add(
+          'selected'
+        );
+
+
+        document
+          .getElementById(
+            'storyImage'
+          )
+          .value =
+          image;
+
+      }
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | CLOSE MODALS OUTSIDE CLICK
+      |--------------------------------------------------------------------------
+      */
+
+      window.onclick =
+        function(event) {
+
+
+          const addModal =
+            document.getElementById(
+              'addDogModal'
+            );
+
+
+          const editModal =
+            document.getElementById(
+              'editDogModal'
+            );
+
+
+          const editStoryModal =
+            document.getElementById(
+              'editStoryModal'
+            );
+
+
+          const declineModal =
+            document.getElementById(
+              'declineModal'
+            );
 
 
           if (
-            item.dataset.image ===
-            imageName
+            event.target ===
+            addModal
           ) {
 
-            item.classList.add(
-              'selected'
-            );
+            closeAddDogModal();
+
           }
 
-        });
-    }
+
+          if (
+            event.target ===
+            editModal
+          ) {
+
+            closeEditDogModal();
+
+          }
 
 
-    function closeEditDogModal() {
-      document
-        .getElementById('editDogModal')
-        .style.display = 'none';
-    }
+          if (
+            event.target ===
+            editStoryModal
+          ) {
+
+            closeEditStoryModal();
+
+          }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | SELECT EDIT IMAGE
-    |--------------------------------------------------------------------------
-    */
+          if (
+            event.target ===
+            declineModal
+          ) {
 
-    function selectEditImage(element, image) {
+            closeDeclineModal();
+
+          }
+
+        };
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | ACTIVE NAVIGATION
+      |--------------------------------------------------------------------------
+      */
 
       document
         .querySelectorAll(
-          '#editDogModal .image-option'
+          '.nav-link'
         )
-        .forEach(function(item) {
+        .forEach(
+          function(link) {
 
-          item.classList.remove(
-            'selected'
+
+            link.addEventListener(
+              'click',
+              function() {
+
+
+                document
+                  .querySelectorAll(
+                    '.nav-link'
+                  )
+                  .forEach(
+                    function(item) {
+
+                      item.classList.remove(
+                        'active'
+                      );
+
+                    }
+                  );
+
+
+                if (
+                  this
+                  .getAttribute(
+                    'href'
+                  )
+                  .startsWith('#')
+                ) {
+
+                  this.classList.add(
+                    'active'
+                  );
+
+                }
+
+              }
+            );
+
+          }
+        );
+
+
+      /*
+      |--------------------------------------------------------------------------
+      | CHAT NOTIFICATION POLLING
+      |--------------------------------------------------------------------------
+      */
+
+      function checkChatNotifications() {
+
+
+        fetch(
+            'chat_notification.php', {
+              cache: 'no-store'
+            }
+          )
+
+
+          .then(
+            function(response) {
+
+              return response.json();
+
+            }
+          )
+
+
+          .then(
+            function(data) {
+
+
+              const chatLink =
+                document.querySelector(
+                  '.chat-nav-link'
+                );
+
+
+              if (!chatLink) {
+
+                return;
+
+              }
+
+
+              let badge =
+                chatLink.querySelector(
+                  '.chat-notification'
+                );
+
+
+              const count =
+                parseInt(
+                  data.count || 0
+                );
+
+
+              if (count > 0) {
+
+
+                if (!badge) {
+
+                  badge =
+                    document.createElement(
+                      'span'
+                    );
+
+                  badge.className =
+                    'chat-notification';
+
+                  chatLink.appendChild(
+                    badge
+                  );
+
+                }
+
+
+                badge.textContent =
+                  count;
+
+              } else {
+
+
+                if (badge) {
+
+                  badge.remove();
+
+                }
+
+              }
+
+            }
+          )
+
+
+          .catch(
+            function(error) {
+
+              console.log(
+                'Chat notification error:',
+                error
+              );
+
+            }
           );
 
-        });
+      }
 
 
-      element.classList.add(
-        'selected'
+      /*
+      |--------------------------------------------------------------------------
+      | CHECK CHAT EVERY 5 SECONDS
+      |--------------------------------------------------------------------------
+      */
+
+      setInterval(
+        checkChatNotifications,
+        5000
       );
-
-
-      document
-        .getElementById('editDogImage')
-        .value = image;
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | DECLINE MODAL
-    |--------------------------------------------------------------------------
-    */
-
-    function openDeclineModal(applicationId) {
-
-      document
-        .getElementById(
-          'declineApplicationId'
-        )
-        .value = applicationId;
-
-
-      document
-        .getElementById(
-          'declineModal'
-        )
-        .style.display = 'flex';
-    }
-
-
-    function closeDeclineModal() {
-
-      document
-        .getElementById(
-          'declineModal'
-        )
-        .style.display = 'none';
-
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CLOSE MODALS WHEN CLICKING OUTSIDE
-    |--------------------------------------------------------------------------
-    */
-
-    window.onclick = function(event) {
-
-      const addModal =
-        document.getElementById(
-          'addDogModal'
-        );
-
-      const editModal =
-        document.getElementById(
-          'editDogModal'
-        );
-
-      const declineModal =
-        document.getElementById(
-          'declineModal'
-        );
-
-
-      if (event.target === addModal) {
-
-        closeAddDogModal();
-
-      }
-
-
-      if (event.target === editModal) {
-
-        closeEditDogModal();
-
-      }
-
-
-      if (event.target === declineModal) {
-
-        closeDeclineModal();
-
-      }
-
-    };
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ACTIVE NAVIGATION
-    |--------------------------------------------------------------------------
-    */
-
-    document
-      .querySelectorAll('.nav-link')
-      .forEach(function(link) {
-
-        link.addEventListener(
-          'click',
-          function() {
-
-            document
-              .querySelectorAll(
-                '.nav-link'
-              )
-              .forEach(function(item) {
-
-                item.classList.remove(
-                  'active'
-                );
-
-              });
-
-
-            if (
-              this.getAttribute('href')
-              .startsWith('#')
-            ) {
-
-              this.classList.add(
-                'active'
-              );
-
-            }
-
-          }
-        );
-
-      });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHAT NOTIFICATION POLLING
-    |--------------------------------------------------------------------------
-    |
-    | Keeps Chat Support notification updated.
-    |
-    */
-
-    function checkChatNotifications() {
-
-      fetch(
-          'chat_notification.php', {
-            cache: 'no-store'
-          }
-        )
-
-        .then(function(response) {
-
-          return response.json();
-
-        })
-
-        .then(function(data) {
-
-          const chatLink =
-            document.querySelector(
-              '.chat-nav-link'
-            );
-
-          if (!chatLink) {
-            return;
-          }
-
-
-          let badge =
-            chatLink.querySelector(
-              '.chat-notification'
-            );
-
-
-          const count =
-            parseInt(
-              data.count || 0
-            );
-
-
-          if (count > 0) {
-
-            if (!badge) {
-
-              badge =
-                document.createElement(
-                  'span'
-                );
-
-              badge.className =
-                'chat-notification';
-
-              chatLink.appendChild(
-                badge
-              );
-            }
-
-
-            badge.textContent =
-              count;
-
-          } else {
-
-            if (badge) {
-
-              badge.remove();
-
-            }
-
-          }
-
-        })
-
-        .catch(function(error) {
-
-          console.log(
-            'Chat notification error:',
-            error
-          );
-
-        });
-
-    }
-
-
-    /*
-    | Check every 5 seconds
-    */
-
-    setInterval(
-      checkChatNotifications,
-      5000
-    );
-  </script>
+    </script>
 
 
 </body>
