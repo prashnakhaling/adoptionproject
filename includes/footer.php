@@ -644,7 +644,7 @@
             </p>
 
 
-            <a
+            <!-- <a
                 href="available-dogs.php"
                 class="htd-footer-adopt-btn">
 
@@ -656,7 +656,7 @@
                     →
                 </span>
 
-            </a>
+            </a> -->
 
         </div>
 
@@ -689,7 +689,7 @@
 
 
                 <li>
-                    <a href="available-dogs.php">
+                    <a href="availabledogs.php">
                         Available Dogs
                     </a>
                 </li>

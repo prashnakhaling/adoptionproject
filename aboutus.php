@@ -24,8 +24,10 @@
     <link rel="preconnect"
         href="https://fonts.gstatic.com"
         crossorigin>
+
     <link rel="stylesheet" href="assets/style.css">
 
+    <link rel="stylesheet" href="assets/style.css">
 
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -71,43 +73,52 @@
 
         .ht-about-hero {
             width: 100%;
-            background: #b2b5ff;
-            padding: 80px 20px;
-            text-align: center;
+            height: 550px;
+
+            background-image: url("assets/images/about-us-banner.png");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+
             position: relative;
             overflow: hidden;
+
+            /* Center content vertically + horizontally */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            /* Remove the old padding */
+            padding: 0 20px;
         }
+
+
+        /* Optional dark/soft overlay
+   Helps text remain readable on the image */
 
         .ht-about-hero::before {
-            content: "🐾";
-
+            content: "";
             position: absolute;
-            left: 5%;
-            top: 20px;
 
-            font-size: 160px;
+            inset: 0;
 
-            opacity: 0.07;
+            background: rgba(30, 20, 70, 0.15);
 
-            transform: rotate(-15deg);
+            z-index: 1;
         }
 
-        .ht-about-hero::after {
-            content: "🐾";
-
-            position: absolute;
-            right: 5%;
-            bottom: -25px;
-
-            font-size: 160px;
-
-            opacity: 0.07;
-
-            transform: rotate(15deg);
+        .ht-about-step-circle .fa-house {
+            font-size: 20px;
+            line-height: 1;
         }
+
+        /* Hero content */
 
         .ht-about-hero-inner {
             position: relative;
+
             z-index: 2;
 
             width: 100%;
@@ -115,6 +126,9 @@
 
             margin: 0 auto;
         }
+
+
+        /* Small label */
 
         .ht-about-hero-label {
             font-size: 12px;
@@ -127,6 +141,9 @@
 
             margin-bottom: 12px;
         }
+
+
+        /* Main heading */
 
         .ht-about-hero-title {
             font-size: 46px;
@@ -141,17 +158,84 @@
             color: #6335b3;
         }
 
+
+        /* Description */
+
         .ht-about-hero-text {
             max-width: 680px;
 
             margin: 0 auto;
 
-            color: #5d5879;
+            color: #ffffff;
 
             font-size: 15px;
             line-height: 1.9;
         }
 
+
+        /* =========================================================
+   TABLET
+========================================================= */
+
+        @media (max-width: 1000px) {
+
+            .ht-about-hero {
+                height: 500px;
+            }
+
+            .ht-about-hero-title {
+                font-size: 40px;
+            }
+
+        }
+
+
+        /* =========================================================
+   MOBILE
+========================================================= */
+
+        @media (max-width: 700px) {
+
+            .ht-about-hero {
+                height: 450px;
+
+                padding: 0 20px;
+
+                background-position: center;
+            }
+
+            .ht-about-hero-title {
+                font-size: 32px;
+            }
+
+            .ht-about-hero-text {
+                font-size: 13px;
+                line-height: 1.7;
+            }
+
+            .ht-about-hero-label {
+                font-size: 10px;
+                letter-spacing: 2px;
+            }
+
+        }
+
+
+        /* =========================================================
+   SMALL MOBILE
+========================================================= */
+
+        @media (max-width: 420px) {
+
+            .ht-about-hero {
+                height: 420px;
+            }
+
+            .ht-about-hero-title {
+                font-size: 28px;
+            }
+
+        }
 
         /* =========================================================
    COMMON SECTION
@@ -555,6 +639,111 @@
 
 
         /* =========================================================
+   WHAT TO KNOW BEFORE ADOPTION
+   NEW SECTION
+========================================================= */
+
+        .ht-about-before {
+            background: #ffffff;
+        }
+
+        .ht-about-before-grid {
+            display: grid;
+
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+
+            gap: 22px;
+
+            margin-top: 40px;
+        }
+
+        .ht-about-before-icon i {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .ht-about-before-card {
+            /* background: #f8f6ff; */
+            background: #ebeaef;
+
+            border: 1px solid #eee9ff;
+
+            border-radius: 15px;
+
+            padding: 27px 24px;
+
+            transition:
+                transform 0.25s ease,
+                box-shadow 0.25s ease;
+        }
+
+        .ht-about-before-card:hover {
+            transform: translateY(-4px);
+
+            box-shadow: 0 10px 25px rgba(76, 48, 135, 0.10);
+        }
+
+        .ht-about-before-icon {
+            width: 52px;
+            height: 52px;
+
+            border-radius: 12px;
+
+            background: #e2ddff;
+
+            color: #6939b8;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 20px;
+
+            margin-bottom: 17px;
+        }
+
+        .ht-about-before-title {
+            font-size: 16px;
+
+            color: #302a4d;
+
+            margin: 0 0 9px;
+        }
+
+        .ht-about-before-text {
+            font-size: 12px;
+
+            line-height: 1.8;
+
+            color: #746f80;
+
+            margin: 0;
+        }
+
+        .ht-about-before-note {
+            max-width: 850px;
+
+            margin: 35px auto 0;
+
+            padding: 18px 22px;
+
+            background: #f3efff;
+
+            border-left: 4px solid #7040bd;
+
+            border-radius: 8px;
+
+            color: #625d70;
+
+            font-size: 12px;
+
+            line-height: 1.8;
+
+            text-align: center;
+        }
+
+
+        /* =========================================================
    OBJECTIVES
 ========================================================= */
 
@@ -811,6 +1000,11 @@
                 row-gap: 40px;
             }
 
+            /* New section - tablet */
+            .ht-about-before-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .ht-about-hero-title {
                 font-size: 40px;
             }
@@ -922,6 +1116,27 @@
                 gap: 35px;
 
                 margin-top: 30px;
+            }
+
+
+            /* Before Adoption */
+
+            .ht-about-before-grid {
+                grid-template-columns: 1fr;
+
+                gap: 16px;
+
+                margin-top: 30px;
+            }
+
+            .ht-about-before-card {
+                padding: 24px 21px;
+            }
+
+            .ht-about-before-note {
+                margin-top: 25px;
+
+                padding: 16px 18px;
             }
 
 
@@ -1072,7 +1287,7 @@
                     <div class="ht-about-project-image">
 
                         <img
-                            src="images/about-dog.jpg"
+                            src="/assets/images/feeding-dog.jpg"
                             alt="Dog waiting for adoption">
 
                     </div>
@@ -1316,7 +1531,7 @@
          PLATFORM FEATURES
     ===================================================== -->
 
-        <section class="ht-about-section ht-about-features">
+        <!-- <section class="ht-about-section ht-about-features">
 
             <div class="ht-about-container">
 
@@ -1477,7 +1692,7 @@
 
             </div>
 
-        </section>
+        </section> -->
 
 
 
@@ -1587,6 +1802,180 @@
 
 
         <!-- =====================================================
+         WHAT TO KNOW BEFORE ADOPTION
+    ===================================================== -->
+
+        <section class="ht-about-section ht-about-before">
+
+            <div class="ht-about-container">
+
+                <div class="ht-about-heading">
+
+                    <div class="ht-about-heading-label">
+                        BEFORE YOU ADOPT
+                    </div>
+
+                    <h2 class="ht-about-heading-title">
+                        What To Know Before You Adopt A Dog
+                    </h2>
+
+                    <p class="ht-about-heading-text">
+                        Adopting a dog is a long-term commitment. Before
+                        bringing a new companion home, it is important to
+                        understand the responsibilities involved.
+                    </p>
+
+                </div>
+
+
+                <div class="ht-about-before-grid">
+
+
+                    <!-- Card 1 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-solid fa-house"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Check Your Home
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            Make sure your home is safe and suitable for a dog.
+                            Consider the available space, surroundings and
+                            whether pets are allowed where you live.
+                        </p>
+
+                    </div>
+
+
+                    <!-- Card 2 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-regular fa-clock"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Be Ready For Commitment
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            Dogs need daily care, attention, exercise and
+                            companionship. Make sure you have enough time to
+                            meet their needs throughout their lives.
+                        </p>
+
+                    </div>
+
+
+                    <!-- Card 3 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Understand The Cost
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            Food, grooming, vaccinations, veterinary care,
+                            supplies and other needs can create ongoing costs.
+                            Plan your budget before adopting.
+                        </p>
+
+                    </div>
+
+
+                    <!-- Card 4 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-solid fa-heart"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Give Them Time
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            A newly adopted dog may need time to become
+                            comfortable in a new environment. Patience,
+                            consistency and kindness can help them adjust.
+                        </p>
+
+                    </div>
+
+
+                    <!-- Card 5 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-solid fa-people-group"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Consider Your Family
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            Think about everyone who lives in your home,
+                            including children and other pets. Choose a dog
+                            whose needs and temperament fit your household.
+                        </p>
+
+                    </div>
+
+
+                    <!-- Card 6 -->
+
+                    <div class="ht-about-before-card">
+
+                        <div class="ht-about-before-icon">
+                            <i class="fa-solid fa-stethoscope"></i>
+                        </div>
+
+                        <h3 class="ht-about-before-title">
+                            Prepare For Their Care
+                        </h3>
+
+                        <p class="ht-about-before-text">
+                            Dogs need regular health care, vaccinations,
+                            proper nutrition and attention to their physical
+                            and emotional well-being.
+                        </p>
+
+                    </div>
+
+
+                </div>
+
+
+                <div class="ht-about-before-note">
+
+                    <strong>Remember:</strong>
+                    Adoption is not just about finding a dog you like.
+                    It is about making sure you are ready to provide a safe,
+                    caring and responsible home for the long term.
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =====================================================
          OBJECTIVES
     ===================================================== -->
 
@@ -1595,16 +1984,6 @@
             <div class="ht-about-container">
 
                 <div class="ht-about-objectives-grid">
-
-
-                    <div class="ht-about-objectives-image">
-
-                        <img
-                            src="images/about-rescue.jpg"
-                            alt="Dog adoption">
-
-                    </div>
-
 
                     <div>
 
@@ -1680,7 +2059,17 @@
 
                     </div>
 
+
+                    <div class="ht-about-objectives-image">
+
+                        <img
+                            src="/assets/images/dog-family.jpg"
+                            alt="Dog adoption">
+
+                    </div>
+
                 </div>
+
 
             </div>
 
@@ -1801,7 +2190,7 @@
 
 
                 <a
-                    href="available-dogs.php"
+                    href="availabledogs.php"
                     class="ht-about-cta-button">
 
                     Browse Available Dogs
@@ -1819,5 +2208,6 @@
 
 
 </body>
+<?php require __DIR__ . '/includes/footer.php'; ?>
 
 </html>
