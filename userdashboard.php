@@ -1143,7 +1143,70 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| SEARCH
+| LINEAR SEARCH ALGORITHM
+|--------------------------------------------------------------------------
+|
+| Searches the dogs one by one from the beginning of the array.
+|
+| Time Complexity:
+| Best Case    : O(1)
+| Average Case : O(n)
+| Worst Case   : O(n)
+|
+*/
+
+function linearSearchDogs($dogs, $searchKeyword)
+{
+    $results = [];
+
+    $searchKeyword = trim($searchKeyword);
+
+    /*
+     * If search box is empty,
+     * return all available dogs.
+     */
+    if ($searchKeyword === '') {
+        return $dogs;
+    }
+
+    /*
+     * Linear Search
+     *
+     * Check every dog one by one.
+     */
+    foreach ($dogs as $dog) {
+
+        $breed =
+            trim(
+                $dog['dog_breed'] ?? ''
+            );
+
+        /*
+         * Case-insensitive partial matching.
+         *
+         * Example:
+         * "lab" → Labrador
+         * "gold" → Golden Retriever
+         */
+        if (
+            $breed !== '' &&
+            stripos(
+                $breed,
+                $searchKeyword
+            ) !== false
+        ) {
+
+            $results[] = $dog;
+        }
+    }
+
+    return $results;
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SEARCH INPUT
 |--------------------------------------------------------------------------
 */
 
@@ -1153,32 +1216,18 @@ $search =
     );
 
 
-$displayDogs = [];
+/*
+|--------------------------------------------------------------------------
+| APPLY LINEAR SEARCH
+|--------------------------------------------------------------------------
+*/
 
-
-if ($search !== '') {
-
-    foreach ($dogs as $dog) {
-
-        if (
-            stripos(
-                $dog['dog_breed'],
-                $search
-            ) !== false
-        ) {
-
-            $displayDogs[] =
-                $dog;
-        }
-    }
-} else {
-
-    $displayDogs =
-        $dogs;
-}
-
+$displayDogs =
+    linearSearchDogs(
+        $dogs,
+        $search
+    );
 ?>
-
 <!DOCTYPE html>
 
 <html lang="en">
@@ -2475,8 +2524,8 @@ if ($search !== '') {
 
                     <?php if (
                         !empty(trim(
-                                $selectedDog['description'] ?? ''
-                            ))
+                            $selectedDog['description'] ?? ''
+                        ))
                     ): ?>
 
                         <p>
@@ -2529,24 +2578,25 @@ if ($search !== '') {
 
             <form
                 method="GET"
-                class="search-box">
-
+                action="userdashboard.php"
+                class="search-box"
+                id="dogSearchForm">
 
                 <input
                     type="text"
                     name="search"
+                    id="dogSearchInput"
                     value="<?= htmlspecialchars(
                                 $search,
                                 ENT_QUOTES,
                                 'UTF-8'
                             ) ?>"
-                    placeholder="Search dog by breed...">
-
+                    placeholder="Search dog by breed..."
+                    autocomplete="off">
 
                 <button type="submit">
                     Search
                 </button>
-
 
             </form>
 
@@ -2659,5 +2709,37 @@ if ($search !== '') {
 
 
 </body>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+        const searchInput = document.getElementById('dogSearchInput');
+
+        if (!searchInput) {
+            return;
+        }
+
+        searchInput.addEventListener('input', function() {
+
+            /*
+             * If search box becomes empty,
+             * reload the dashboard without the search parameter.
+             *
+             * Example:
+             * userdashboard.php?search=labrador
+             *
+             * becomes:
+             * userdashboard.php
+             */
+
+            if (this.value.trim() === '') {
+
+                window.location.href = 'userdashboard.php';
+
+            }
+
+        });
+
+    });
+</script>
 
 </html>

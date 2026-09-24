@@ -243,11 +243,11 @@ $result = mysqli_query($conn, $sql);
                             </span>
                         </div>
 
-                        <a href="dog-details.php?id=<?php echo $dog['dog_id']; ?>"
+                        <!-- <a href="dog-details.php?id=<?php echo $dog['dog_id']; ?>"
                             class="view-dog-btn">
                             View Dog
                             <i class="fa-solid fa-arrow-right"></i>
-                        </a>
+                        </a> -->
 
                     </div>
 
@@ -259,7 +259,7 @@ $result = mysqli_query($conn, $sql);
 
         <!-- Button below all 4 dogs -->
         <div class="view-all-container">
-            <a href="available-dogs.php" class="view-all-btn">
+            <a href="availabledogs.php" class="view-all-btn">
                 View All Dogs
                 <i class="fa-solid fa-arrow-right"></i>
             </a>
@@ -378,16 +378,17 @@ $result = mysqli_query($conn, $sql);
 
     </section>
 
-    <footer class="simple-footer">
+    <!-- <footer class="simple-footer">
         <div class="footer-content" id="contact-section">
             <div class="footer-content">
                 <p>&copy; 2025 Happy Tails Dog Adoption</p>
                 <p>Email: info@dogadoption.org | Phone: (123) 456-7890</p>
             </div>
         </div>
-    </footer>
+    </footer> -->
 
 </body>
 
 
-</html>//
+</html>
+<?php require __DIR__ . '/includes/footer.php'; ?>
