@@ -30,39 +30,20 @@ require_once __DIR__ . '/PHPMailer/src/SMTP.php';
    ========================================================= */
 
 if (
-    empty($_SESSION['logged_in']) ||
-    empty($_SESSION['user_email'])
+    !isset($_SESSION['logged_in']) ||
+    $_SESSION['logged_in'] !== true
 ) {
-    header("Location: index.php");
+    header("Location: login.php");
     exit;
 }
 
 
-/* =========================================================
-   USER INFORMATION
-   ========================================================= */
-
-$userEmail = $_SESSION['user_email'];
-
-$userName = '';
-
-if (!empty($_SESSION['user_name'])) {
-    $userName = $_SESSION['user_name'];
-} elseif (!empty($_SESSION['username'])) {
-    $userName = $_SESSION['username'];
-} elseif (!empty($_SESSION['name'])) {
-    $userName = $_SESSION['name'];
-} elseif (!empty($_SESSION['user'])) {
-    $userName = $_SESSION['user'];
-}
-
-if ($userName === '') {
-    $userName = 'User';
-}
+$userEmail = $_SESSION['user_email'] ?? '';
+$userName  = $_SESSION['username'] ?? 'User';
 
 
 /* =========================================================
-   HELPER: IMAGE PATH
+   IMAGE PATH FUNCTION
    ========================================================= */
 
 function getDogImagePath($imagePath)
@@ -73,36 +54,67 @@ function getDogImagePath($imagePath)
         return 'placeholder.jpg';
     }
 
-    $imagePath = str_replace('\\', '/', $imagePath);
 
-    $imagePath = preg_replace('#^\./+#', '', $imagePath);
+    /*
+     * Remove leading slash if present
+     */
 
-    $imagePath = ltrim($imagePath, '/');
+    $imagePath = ltrim($imagePath, '/\\');
 
 
-    /* Full relative path already stored */
+    /*
+     * If database already contains:
+     *
+     * dogpic/dog1.jpg
+     *
+     * check it directly.
+     */
 
-    if (is_file(__DIR__ . '/' . $imagePath)) {
+    if (file_exists(__DIR__ . '/' . $imagePath)) {
         return $imagePath;
     }
 
 
-    /* Only filename stored */
+    /*
+     * If only filename is stored:
+     *
+     * dog1.jpg
+     */
 
-    if (strpos($imagePath, '/') === false) {
+    if (
+        file_exists(
+            __DIR__ . '/dogpic/' . $imagePath
+        )
+    ) {
+        return 'dogpic/' . $imagePath;
+    }
 
-        $dogPicPath = 'dogpic/' . $imagePath;
 
-        if (is_file(__DIR__ . '/' . $dogPicPath)) {
-            return $dogPicPath;
-        }
+    /*
+     * Check images folder
+     */
+
+    if (
+        file_exists(
+            __DIR__ . '/images/' . $imagePath
+        )
+    ) {
+        return 'images/' . $imagePath;
+    }
 
 
-        $imagesPath = 'images/' . $imagePath;
+    /*
+     * Check dogpic again using basename
+     */
 
-        if (is_file(__DIR__ . '/' . $imagesPath)) {
-            return $imagesPath;
-        }
+    $filename = basename($imagePath);
+
+    if (
+        file_exists(
+            __DIR__ . '/dogpic/' . $filename
+        )
+    ) {
+        return 'dogpic/' . $filename;
     }
 
 
@@ -111,12 +123,14 @@ function getDogImagePath($imagePath)
 
 
 /* =========================================================
-   HELPER: CHECK DOG TABLE COLUMNS
+   DOG COLUMNS
    ========================================================= */
 
 $dogColumns = [];
 
-$columnResult = $conn->query("SHOW COLUMNS FROM dogs");
+$columnResult = $conn->query(
+    "SHOW COLUMNS FROM dogs"
+);
 
 if ($columnResult) {
 
@@ -128,14 +142,620 @@ if ($columnResult) {
 
 
 /* =========================================================
-   HELPER: COLUMN EXISTS
+   COLUMN CHECK
    ========================================================= */
 
-function dogColumnExists($column)
+function hasDogColumn($column, $dogColumns)
 {
-    global $dogColumns;
+    return in_array(
+        $column,
+        $dogColumns
+    );
+}
 
-    return in_array($column, $dogColumns, true);
+
+/* =========================================================
+   SEARCH ALGORITHM
+   ========================================================= */
+
+function searchDogs(
+    $conn,
+    $search,
+    $dogColumns
+) {
+
+    $search = trim($search);
+
+    if ($search === '') {
+        return [];
+    }
+
+
+    $searchLike =
+        '%' . $search . '%';
+
+
+    $conditions = [];
+
+
+    /*
+     * Breed
+     */
+
+    if (
+        hasDogColumn(
+            'dog_breed',
+            $dogColumns
+        )
+    ) {
+
+        $conditions[] =
+            "dog_breed LIKE ?";
+    }
+
+
+    /*
+     * Age
+     */
+
+    if (
+        hasDogColumn(
+            'age',
+            $dogColumns
+        )
+    ) {
+
+        $conditions[] =
+            "age LIKE ?";
+    }
+
+
+    /*
+     * Size
+     */
+
+    if (
+        hasDogColumn(
+            'size',
+            $dogColumns
+        )
+    ) {
+
+        $conditions[] =
+            "size LIKE ?";
+    }
+
+
+    /*
+     * Gender
+     */
+
+    if (
+        hasDogColumn(
+            'gender',
+            $dogColumns
+        )
+    ) {
+
+        $conditions[] =
+            "gender LIKE ?";
+    }
+
+
+    /*
+     * Description
+     */
+
+    if (
+        hasDogColumn(
+            'description',
+            $dogColumns
+        )
+    ) {
+
+        $conditions[] =
+            "description LIKE ?";
+    }
+
+
+    if (empty($conditions)) {
+        return [];
+    }
+
+
+    $sql = "
+        SELECT *
+        FROM dogs
+        WHERE
+        " . implode(
+        " OR ",
+        $conditions
+    );
+
+
+    /*
+     * Order
+     */
+
+    if (
+        hasDogColumn(
+            'added_date',
+            $dogColumns
+        )
+    ) {
+
+        $sql .= "
+            ORDER BY added_date DESC
+        ";
+    } else {
+
+        $sql .= "
+            ORDER BY dog_id DESC
+        ";
+    }
+
+
+    $stmt =
+        $conn->prepare($sql);
+
+
+    if (!$stmt) {
+
+        error_log(
+            "Search Error: "
+                . $conn->error
+        );
+
+        return [];
+    }
+
+
+    /*
+     * Create parameters
+     */
+
+    $params = [];
+
+    $types = '';
+
+
+    foreach (
+        $conditions
+        as $condition
+    ) {
+
+        $params[] =
+            $searchLike;
+
+        $types .= 's';
+    }
+
+
+    $stmt->bind_param(
+        $types,
+        ...$params
+    );
+
+
+    if (!$stmt->execute()) {
+
+        $stmt->close();
+
+        return [];
+    }
+
+
+    $result =
+        $stmt->get_result();
+
+
+    $dogs = [];
+
+
+    while (
+        $row =
+        $result->fetch_assoc()
+    ) {
+
+        /*
+         * IMPORTANT:
+         * Convert database image path
+         * to correct path.
+         */
+
+        $row['image_url'] =
+            getDogImagePath(
+                $row['dog_image'] ?? ''
+            );
+
+
+        $dogs[] = $row;
+    }
+
+
+    $stmt->close();
+
+
+    return $dogs;
+}
+
+
+/* =========================================================
+   RECOMMENDATION SCORE
+   ========================================================= */
+
+function calculateRecommendationScore(
+    $dog,
+    $search
+) {
+
+    $search =
+        strtolower(
+            trim($search)
+        );
+
+
+    if ($search === '') {
+        return 0;
+    }
+
+
+    $score = 0;
+
+
+    /*
+     * Dog information
+     */
+
+    $breed =
+        strtolower(
+            trim(
+                (string)
+                ($dog['dog_breed'] ?? '')
+            )
+        );
+
+
+    $age =
+        strtolower(
+            trim(
+                (string)
+                ($dog['age'] ?? '')
+            )
+        );
+
+
+    $size =
+        strtolower(
+            trim(
+                (string)
+                ($dog['size'] ?? '')
+            )
+        );
+
+
+    $gender =
+        strtolower(
+            trim(
+                (string)
+                ($dog['gender'] ?? '')
+            )
+        );
+
+
+    $description =
+        strtolower(
+            trim(
+                (string)
+                ($dog['description'] ?? '')
+            )
+        );
+
+
+    /* =====================================================
+       EXACT BREED
+       ===================================================== */
+
+    if (
+        $breed !== '' &&
+        $breed === $search
+    ) {
+
+        $score += 100;
+    }
+
+
+    /* =====================================================
+       PARTIAL BREED
+       ===================================================== */ elseif (
+        $breed !== '' &&
+        strpos(
+            $breed,
+            $search
+        ) !== false
+    ) {
+
+        $score += 80;
+    }
+
+
+    /* =====================================================
+       WORD MATCH
+       ===================================================== */
+
+    $words =
+        preg_split(
+            '/\s+/',
+            $search,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        );
+
+
+    foreach (
+        $words
+        as $word
+    ) {
+
+        if (
+            strlen($word) < 2
+        ) {
+            continue;
+        }
+
+
+        /*
+         * Breed
+         */
+
+        if (
+            $breed !== '' &&
+            strpos(
+                $breed,
+                $word
+            ) !== false
+        ) {
+
+            $score += 40;
+        }
+
+
+        /*
+         * Size
+         */
+
+        if (
+            $size !== '' &&
+            strpos(
+                $size,
+                $word
+            ) !== false
+        ) {
+
+            $score += 25;
+        }
+
+
+        /*
+         * Gender
+         */
+
+        if (
+            $gender !== '' &&
+            strpos(
+                $gender,
+                $word
+            ) !== false
+        ) {
+
+            $score += 25;
+        }
+
+
+        /*
+         * Age
+         */
+
+        if (
+            $age !== '' &&
+            strpos(
+                $age,
+                $word
+            ) !== false
+        ) {
+
+            $score += 20;
+        }
+
+
+        /*
+         * Description
+         */
+
+        if (
+            $description !== '' &&
+            strpos(
+                $description,
+                $word
+            ) !== false
+        ) {
+
+            $score += 15;
+        }
+    }
+
+
+    return $score;
+}
+
+
+/* =========================================================
+   RECOMMENDATION ALGORITHM
+   ========================================================= */
+
+function recommendDogs(
+    $conn,
+    $search,
+    $dogColumns
+) {
+
+    $search =
+        trim($search);
+
+
+    if ($search === '') {
+        return [];
+    }
+
+
+    /*
+     * Get all dogs
+     */
+
+    if (
+        hasDogColumn(
+            'added_date',
+            $dogColumns
+        )
+    ) {
+
+        $sql = "
+            SELECT *
+            FROM dogs
+            ORDER BY added_date DESC
+        ";
+    } else {
+
+        $sql = "
+            SELECT *
+            FROM dogs
+            ORDER BY dog_id DESC
+        ";
+    }
+
+
+    $result =
+        $conn->query($sql);
+
+
+    if (!$result) {
+        return [];
+    }
+
+
+    $recommendedDogs = [];
+
+
+    while (
+        $dog =
+        $result->fetch_assoc()
+    ) {
+
+        /*
+         * Calculate score
+         */
+
+        $score =
+            calculateRecommendationScore(
+                $dog,
+                $search
+            );
+
+
+        if ($score > 0) {
+
+            /*
+             * IMPORTANT:
+             * Add correct image URL
+             */
+
+            $dog['image_url'] =
+                getDogImagePath(
+                    $dog['dog_image'] ?? ''
+                );
+
+
+            $dog['recommendation_score'] =
+                $score;
+
+
+            $recommendedDogs[] =
+                $dog;
+        }
+    }
+
+
+    /*
+     * Sort by highest score
+     */
+
+    usort(
+        $recommendedDogs,
+        function ($a, $b) {
+
+            return
+                $b['recommendation_score']
+                -
+                $a['recommendation_score'];
+        }
+    );
+
+
+    /*
+     * Top 6
+     */
+
+    return array_slice(
+        $recommendedDogs,
+        0,
+        6
+    );
+}
+
+
+/* =========================================================
+   AJAX SEARCH
+   ========================================================= */
+
+if (
+    isset(
+        $_GET['ajax_search']
+    )
+) {
+
+    ini_set(
+        'display_errors',
+        0
+    );
+
+
+    header(
+        'Content-Type: application/json; charset=UTF-8'
+    );
+
+
+    $search =
+        trim(
+            $_GET['ajax_search']
+        );
+
+
+    $results =
+        searchDogs(
+            $conn,
+            $search,
+            $dogColumns
+        );
+
+
+    echo json_encode([
+        'success' => true,
+        'count'   => count($results),
+        'dogs'    => $results
+    ]);
+
+
+    exit;
 }
 
 
@@ -143,407 +763,43 @@ function dogColumnExists($column)
    AJAX RECOMMENDATION
    ========================================================= */
 
-if (isset($_GET['ajax_recommend'])) {
+if (
+    isset(
+        $_GET['ajax_recommend']
+    )
+) {
 
-    /*
-    IMPORTANT:
-    No HTML should be output before this JSON response.
-    */
-
-    header('Content-Type: application/json; charset=UTF-8');
-
-    $search = trim($_GET['ajax_recommend']);
-
-
-    /* Empty search */
-
-    if ($search === '') {
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'Please enter something to search.',
-            'dogs' => []
-        ]);
-
-        exit;
-    }
-
-
-    /* =====================================================
-       BUILD QUERY USING EXISTING COLUMNS
-       ===================================================== */
-
-    $selectFields = [
-        "dog_id",
-        "dog_breed"
-    ];
-
-
-    if (dogColumnExists('dog_image')) {
-        $selectFields[] = "dog_image";
-    } else {
-        $selectFields[] = "'' AS dog_image";
-    }
-
-
-    if (dogColumnExists('age')) {
-        $selectFields[] = "age";
-    } else {
-        $selectFields[] = "'' AS age";
-    }
-
-
-    if (dogColumnExists('size')) {
-        $selectFields[] = "size";
-    } else {
-        $selectFields[] = "'' AS size";
-    }
-
-
-    if (dogColumnExists('gender')) {
-        $selectFields[] = "gender";
-    } else {
-        $selectFields[] = "'' AS gender";
-    }
-
-
-    if (dogColumnExists('description')) {
-        $selectFields[] = "description";
-    } else {
-        $selectFields[] = "'' AS description";
-    }
-
-
-    $sql = "SELECT "
-        . implode(", ", $selectFields)
-        . " FROM dogs";
-
-
-    /* Order */
-
-    if (dogColumnExists('added_date')) {
-
-        $sql .= " ORDER BY added_date DESC";
-    } else {
-
-        $sql .= " ORDER BY dog_id DESC";
-    }
-
-
-    $result = $conn->query($sql);
-
-
-    /* Database error */
-
-    if (!$result) {
-
-        echo json_encode([
-            'success' => false,
-            'message' => 'Database error: ' . $conn->error,
-            'dogs' => []
-        ]);
-
-        exit;
-    }
-
-
-    /* =====================================================
-       SEARCH TEXT
-       ===================================================== */
-
-    $searchLower = strtolower($search);
-
-    $words = preg_split(
-        '/\s+/',
-        $searchLower,
-        -1,
-        PREG_SPLIT_NO_EMPTY
+    ini_set(
+        'display_errors',
+        0
     );
 
 
-    $recommendations = [];
-
-
-    /* =====================================================
-       SCORE DOGS
-       ===================================================== */
-
-    while ($dog = $result->fetch_assoc()) {
-
-        $breed = strtolower(
-            trim((string)$dog['dog_breed'])
-        );
-
-        $age = strtolower(
-            trim((string)$dog['age'])
-        );
-
-        $size = strtolower(
-            trim((string)$dog['size'])
-        );
-
-        $gender = strtolower(
-            trim((string)$dog['gender'])
-        );
-
-        $description = strtolower(
-            trim((string)$dog['description'])
-        );
-
-
-        $score = 0;
-
-
-        /* =================================================
-           EXACT BREED
-           ================================================= */
-
-        if ($breed === $searchLower) {
-
-            $score += 100;
-        } elseif (
-            $breed !== '' &&
-            strpos($breed, $searchLower) !== false
-        ) {
-
-            $score += 80;
-        }
-
-
-        /* =================================================
-           WORD-BY-WORD MATCHING
-           ================================================= */
-
-        foreach ($words as $word) {
-
-            if ($word === '') {
-                continue;
-            }
-
-
-            /* Breed */
-
-            if (
-                $breed !== '' &&
-                strpos($breed, $word) !== false
-            ) {
-
-                $score += 40;
-            }
-
-
-            /* Size */
-
-            if (
-                $size !== '' &&
-                strpos($size, $word) !== false
-            ) {
-
-                $score += 25;
-            }
-
-
-            /* Gender */
-
-            if (
-                $gender !== '' &&
-                strpos($gender, $word) !== false
-            ) {
-
-                $score += 25;
-            }
-
-
-            /* Age */
-
-            if (
-                $age !== '' &&
-                strpos($age, $word) !== false
-            ) {
-
-                $score += 20;
-            }
-
-
-            /* Description */
-
-            if (
-                $description !== '' &&
-                strpos($description, $word) !== false
-            ) {
-
-                $score += 15;
-            }
-        }
-
-
-        /* =================================================
-           ADD MATCHED DOG
-           ================================================= */
-
-        if ($score > 0) {
-
-            $image = getDogImagePath(
-                $dog['dog_image']
-            );
-
-
-            $recommendations[] = [
-
-                'dog_id' => (int)$dog['dog_id'],
-
-                'dog_breed' =>
-                $dog['dog_breed'],
-
-                'age' =>
-                $dog['age'],
-
-                'size' =>
-                $dog['size'],
-
-                'gender' =>
-                $dog['gender'],
-
-                'description' =>
-                $dog['description'],
-
-                'image_url' =>
-                $image,
-
-                'score' =>
-                min($score, 100)
-            ];
-        }
-    }
-
-
-    /* =====================================================
-       SORT BY SCORE
-       ===================================================== */
-
-    usort(
-        $recommendations,
-        function ($a, $b) {
-
-            if ($a['score'] == $b['score']) {
-
-                return
-                    $b['dog_id']
-                    <=>
-                    $a['dog_id'];
-            }
-
-            return
-                $b['score']
-                <=>
-                $a['score'];
-        }
+    header(
+        'Content-Type: application/json; charset=UTF-8'
     );
 
 
-    /* =====================================================
-       TOP 6
-       ===================================================== */
+    $search =
+        trim(
+            $_GET['ajax_recommend']
+        );
+
 
     $recommendations =
-        array_slice(
-            $recommendations,
-            0,
-            6
+        recommendDogs(
+            $conn,
+            $search,
+            $dogColumns
         );
 
 
-    /* =====================================================
-       FALLBACK
-       
-       If search does not match any dog,
-       show latest available dogs.
-       ===================================================== */
+    echo json_encode([
+        'success' => true,
+        'count'   => count($recommendations),
+        'dogs'    => $recommendations
+    ]);
 
-    if (count($recommendations) === 0) {
-
-        $fallbackSql = "SELECT "
-            . implode(", ", $selectFields)
-            . " FROM dogs";
-
-        if (dogColumnExists('added_date')) {
-
-            $fallbackSql .=
-                " ORDER BY added_date DESC";
-        } else {
-
-            $fallbackSql .=
-                " ORDER BY dog_id DESC";
-        }
-
-        $fallbackSql .= " LIMIT 6";
-
-
-        $fallbackResult =
-            $conn->query($fallbackSql);
-
-
-        if ($fallbackResult) {
-
-            while (
-                $dog =
-                $fallbackResult->fetch_assoc()
-            ) {
-
-                $image =
-                    getDogImagePath(
-                        $dog['dog_image']
-                    );
-
-
-                $recommendations[] = [
-
-                    'dog_id' =>
-                    (int)$dog['dog_id'],
-
-                    'dog_breed' =>
-                    $dog['dog_breed'],
-
-                    'age' =>
-                    $dog['age'],
-
-                    'size' =>
-                    $dog['size'],
-
-                    'gender' =>
-                    $dog['gender'],
-
-                    'description' =>
-                    $dog['description'],
-
-                    'image_url' =>
-                    $image,
-
-                    'score' => 0
-                ];
-            }
-        }
-    }
-
-
-    /* =====================================================
-       SEND JSON
-       ===================================================== */
-
-    echo json_encode(
-        [
-            'success' => true,
-
-            'search' => $search,
-
-            'count' =>
-            count($recommendations),
-
-            'dogs' =>
-            $recommendations
-        ],
-        JSON_UNESCAPED_UNICODE
-    );
 
     exit;
 }
@@ -553,264 +809,292 @@ if (isset($_GET['ajax_recommend'])) {
    ADOPTION APPLICATION
    ========================================================= */
 
-$successMessage = '';
-$errorMessage = '';
+$applicationMessage = '';
+
+$applicationSuccess = false;
 
 
 if (
-    $_SERVER['REQUEST_METHOD'] === 'POST' &&
-    isset($_POST['submit_adoption'])
+    $_SERVER['REQUEST_METHOD']
+    === 'POST'
 ) {
 
 
-    /* =====================================================
-       FORM DATA
-       ===================================================== */
-
-    $ownerName =
-        trim($_POST['owner_name'] ?? '');
-
-    $dogId =
-        (int)($_POST['dog_id'] ?? 0);
-
-    $dogBreed =
-        trim($_POST['dog_breed'] ?? '');
-
-    $phone =
-        trim($_POST['phone'] ?? '');
-
-    $address =
-        trim($_POST['address'] ?? '');
-
-    $reason =
-        trim($_POST['reason'] ?? '');
-
-
-    /* =====================================================
-       VALIDATION
-       ===================================================== */
-
     if (
-        $ownerName === '' ||
-        $dogId <= 0 ||
-        $dogBreed === '' ||
-        $phone === '' ||
-        $address === '' ||
-        $reason === ''
-    ) {
-
-        $errorMessage =
-            "Please fill in all fields.";
-    } elseif (
-        !preg_match(
-            '/^(97|98)[0-9]{8}$/',
-            $phone
+        isset(
+            $_POST['submit_adoption']
         )
     ) {
 
-        $errorMessage =
-            "Please enter a valid Nepal mobile number.";
-    } else {
+
+        $ownerName =
+            trim(
+                $_POST['owner_name']
+                    ?? ''
+            );
 
 
-        /* =================================================
-           CHECK APPLICATION TABLE
-           ================================================= */
+        $phone =
+            trim(
+                $_POST['phone']
+                    ?? ''
+            );
 
-        $checkTable =
-            $conn->query(
-                "SHOW TABLES LIKE 'adoption_applications'"
+
+        $address =
+            trim(
+                $_POST['address']
+                    ?? ''
+            );
+
+
+        $reason =
+            trim(
+                $_POST['reason']
+                    ?? ''
+            );
+
+
+        $dogId =
+            intval(
+                $_POST['dog_id']
+                    ?? 0
+            );
+
+
+        $dogBreed =
+            trim(
+                $_POST['dog_breed']
+                    ?? ''
             );
 
 
         if (
-            !$checkTable ||
-            $checkTable->num_rows === 0
+            $ownerName === '' ||
+            $phone === '' ||
+            $address === '' ||
+            $reason === '' ||
+            $dogId <= 0
         ) {
 
-            $errorMessage =
-                "The adoption_applications table does not exist.";
+            $applicationMessage =
+                "Please fill in all required fields.";
         } else {
 
 
-            /* =================================================
-               INSERT APPLICATION
-               ================================================= */
+            /*
+             * Check table
+             */
 
-            $stmt = $conn->prepare(
-                "INSERT INTO adoption_applications
-                (
-                    owner_name,
-                    dog_id,
-                    dog_breed,
-                    phone,
-                    address,
-                    reason
-                )
-                VALUES (?, ?, ?, ?, ?, ?)"
-            );
-
-
-            if (!$stmt) {
-
-                $errorMessage =
-                    "Database prepare error: "
-                    . $conn->error;
-            } else {
-
-                $stmt->bind_param(
-                    "sissss",
-                    $ownerName,
-                    $dogId,
-                    $dogBreed,
-                    $phone,
-                    $address,
-                    $reason
+            $tableCheck =
+                $conn->query(
+                    "SHOW TABLES LIKE 'adoption_applications'"
                 );
 
 
-                if ($stmt->execute()) {
+            if (
+                !$tableCheck ||
+                $tableCheck->num_rows === 0
+            ) {
 
-                    $successMessage =
-                        "Your adoption application has been submitted successfully!";
-
-
-                    /* =========================================
-                       EMAIL ADMIN
-                       ========================================= */
-
-                    try {
-
-                        $mail =
-                            new PHPMailer(true);
+                $applicationMessage =
+                    "adoption_applications table was not found.";
+            } else {
 
 
-                        $mail->isSMTP();
-
-                        $mail->Host =
-                            'smtp.gmail.com';
-
-                        $mail->SMTPAuth =
-                            true;
-
-                        $mail->Username =
-                            'happytailsnepal@gmail.com';
-
-                        /*
-                         IMPORTANT:
-                         Replace this with your Gmail App Password.
-                        */
-
-                        $mail->Password =
-                            'YOUR_GMAIL_APP_PASSWORD';
+                $stmt =
+                    $conn->prepare("
+                        INSERT INTO adoption_applications
+                        (
+                            owner_name,
+                            dog_id,
+                            dog_breed,
+                            phone,
+                            address,
+                            reason
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ");
 
 
-                        $mail->SMTPSecure =
-                            PHPMailer::ENCRYPTION_STARTTLS;
+                if (!$stmt) {
 
-                        $mail->Port =
-                            587;
-
-
-                        $mail->setFrom(
-                            'happytailsnepal@gmail.com',
-                            'Happy Tails Dog Adoption'
-                        );
-
-
-                        $mail->addAddress(
-                            'happytailsnepal@gmail.com'
-                        );
-
-
-                        $mail->isHTML(true);
-
-
-                        $mail->Subject =
-                            'New Dog Adoption Application';
-
-
-                        $mail->Body = "
-
-                            <h2>New Adoption Application</h2>
-
-                            <p>
-                                <strong>Applicant Name:</strong>
-                                " .
-                            htmlspecialchars(
-                                $ownerName
-                            ) .
-                            "
-                            </p>
-
-                            <p>
-                                <strong>Email:</strong>
-                                " .
-                            htmlspecialchars(
-                                $userEmail
-                            ) .
-                            "
-                            </p>
-
-                            <p>
-                                <strong>Phone:</strong>
-                                " .
-                            htmlspecialchars(
-                                $phone
-                            ) .
-                            "
-                            </p>
-
-                            <p>
-                                <strong>Address:</strong>
-                                " .
-                            nl2br(
-                                htmlspecialchars(
-                                    $address
-                                )
-                            ) .
-                            "
-                            </p>
-
-                            <p>
-                                <strong>Dog:</strong>
-                                " .
-                            htmlspecialchars(
-                                $dogBreed
-                            ) .
-                            "
-                            </p>
-
-                            <p>
-                                <strong>Reason:</strong>
-                                " .
-                            nl2br(
-                                htmlspecialchars(
-                                    $reason
-                                )
-                            ) .
-                            "
-                            </p>
-
-                        ";
-
-
-                        $mail->send();
-                    } catch (Exception $e) {
-
-                        /*
-                        Application is already saved.
-                        Email error is not shown to the user.
-                        */
-                    }
-
-
-                    $stmt->close();
+                    $applicationMessage =
+                        "Database error: "
+                        . $conn->error;
                 } else {
 
-                    $errorMessage =
-                        "Application could not be submitted: "
-                        . $stmt->error;
+
+                    $stmt->bind_param(
+                        "sissss",
+                        $ownerName,
+                        $dogId,
+                        $dogBreed,
+                        $phone,
+                        $address,
+                        $reason
+                    );
+
+
+                    if (
+                        $stmt->execute()
+                    ) {
+
+
+                        $applicationSuccess =
+                            true;
+
+
+                        $applicationMessage =
+                            "Your adoption application has been submitted successfully.";
+
+
+                        /* =================================================
+                           EMAIL
+                           ================================================= */
+
+                        try {
+
+                            $mail =
+                                new PHPMailer(
+                                    true
+                                );
+
+
+                            $mail->isSMTP();
+
+
+                            $mail->Host =
+                                'smtp.gmail.com';
+
+
+                            $mail->SMTPAuth =
+                                true;
+
+
+                            /*
+                             * Enter your Gmail details here.
+                             */
+
+                            $mail->Username =
+                                'YOUR_GMAIL@gmail.com';
+
+
+                            $mail->Password =
+                                'YOUR_GMAIL_APP_PASSWORD';
+
+
+                            $mail->SMTPSecure =
+                                PHPMailer::ENCRYPTION_STARTTLS;
+
+
+                            $mail->Port =
+                                587;
+
+
+                            $mail->setFrom(
+                                'YOUR_GMAIL@gmail.com',
+                                'Happy Tails Dog Adoption'
+                            );
+
+
+                            $mail->addAddress(
+                                'YOUR_ADMIN_EMAIL@gmail.com'
+                            );
+
+
+                            $mail->isHTML(
+                                true
+                            );
+
+
+                            $mail->Subject =
+                                'New Dog Adoption Application';
+
+
+                            $mail->Body = "
+
+                                <h2>
+                                    New Adoption Application
+                                </h2>
+
+                                <p>
+                                    <strong>
+                                        Applicant Name:
+                                    </strong>
+                                    " .
+                                htmlspecialchars(
+                                    $ownerName
+                                ) .
+                                "
+                                </p>
+
+                                <p>
+                                    <strong>
+                                        Dog:
+                                    </strong>
+                                    " .
+                                htmlspecialchars(
+                                    $dogBreed
+                                ) .
+                                "
+                                </p>
+
+                                <p>
+                                    <strong>
+                                        Phone:
+                                    </strong>
+                                    " .
+                                htmlspecialchars(
+                                    $phone
+                                ) .
+                                "
+                                </p>
+
+                                <p>
+                                    <strong>
+                                        Address:
+                                    </strong>
+                                    " .
+                                nl2br(
+                                    htmlspecialchars(
+                                        $address
+                                    )
+                                ) .
+                                "
+                                </p>
+
+                                <p>
+                                    <strong>
+                                        Reason:
+                                    </strong>
+                                    " .
+                                nl2br(
+                                    htmlspecialchars(
+                                        $reason
+                                    )
+                                ) .
+                                "
+
+                            ";
+
+
+                            $mail->send();
+                        } catch (
+                            Exception $e
+                        ) {
+
+                            /*
+                             * Application is already
+                             * saved in database.
+                             */
+                        }
+                    } else {
+
+                        $applicationMessage =
+                            "Failed to submit application.";
+                    }
+
 
                     $stmt->close();
                 }
@@ -821,115 +1105,36 @@ if (
 
 
 /* =========================================================
-   GET ALL AVAILABLE DOGS
+   GET ALL DOGS
    ========================================================= */
 
-$availableDogs = [];
-
-
-$availableSelectFields = [
-
-    "dog_id",
-
-    "dog_breed"
-];
-
-
-if (dogColumnExists('dog_image')) {
-
-    $availableSelectFields[] =
-        "dog_image";
-} else {
-
-    $availableSelectFields[] =
-        "'' AS dog_image";
-}
-
-
-if (dogColumnExists('age')) {
-
-    $availableSelectFields[] =
-        "age";
-} else {
-
-    $availableSelectFields[] =
-        "'' AS age";
-}
-
-
-if (dogColumnExists('size')) {
-
-    $availableSelectFields[] =
-        "size";
-} else {
-
-    $availableSelectFields[] =
-        "'' AS size";
-}
-
-
-if (dogColumnExists('gender')) {
-
-    $availableSelectFields[] =
-        "gender";
-} else {
-
-    $availableSelectFields[] =
-        "'' AS gender";
-}
-
-
-if (dogColumnExists('description')) {
-
-    $availableSelectFields[] =
-        "description";
-} else {
-
-    $availableSelectFields[] =
-        "'' AS description";
-}
-
-
-$availableSql =
-    "SELECT "
-    . implode(
-        ", ",
-        $availableSelectFields
+if (
+    hasDogColumn(
+        'added_date',
+        $dogColumns
     )
-    . " FROM dogs";
+) {
 
-
-if (dogColumnExists('added_date')) {
-
-    $availableSql .=
-        " ORDER BY added_date DESC";
+    $allDogsSql = "
+        SELECT *
+        FROM dogs
+        ORDER BY added_date DESC
+    ";
 } else {
 
-    $availableSql .=
-        " ORDER BY dog_id DESC";
+    $allDogsSql = "
+        SELECT *
+        FROM dogs
+        ORDER BY dog_id DESC
+    ";
 }
 
 
-$availableResult =
-    $conn->query($availableSql);
+$dogsResult =
+    $conn->query(
+        $allDogsSql
+    );
 
-
-if ($availableResult) {
-
-    while (
-        $dog =
-        $availableResult->fetch_assoc()
-    ) {
-
-        $dog['image_url'] =
-            getDogImagePath(
-                $dog['dog_image']
-            );
-
-        $availableDogs[] =
-            $dog;
-    }
-}
 
 ?>
 
@@ -952,9 +1157,9 @@ if ($availableResult) {
 
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
 
 
@@ -965,399 +1170,261 @@ if ($availableResult) {
                 Helvetica,
                 sans-serif;
 
-            background:
-                #f5f6ff;
+            background: #f4f5ff;
 
-            color:
-                #333;
+            color: #333;
         }
 
 
-        /* =================================================
-           NAVBAR
-           ================================================= */
+        /* =========================================================
+   NAVBAR
+   ========================================================= */
 
         .navbar {
-
-            width: 100%;
 
             background:
                 linear-gradient(135deg,
                     #7a83be,
                     #5f67a3);
 
-            padding:
-                16px 40px;
+            padding: 15px 40px;
 
-            display:
-                flex;
+            display: flex;
 
-            justify-content:
-                space-between;
+            justify-content: space-between;
 
-            align-items:
-                center;
+            align-items: center;
 
-            color:
-                white;
+            color: white;
 
-            position:
-                sticky;
+            position: sticky;
 
-            top:
-                0;
+            top: 0;
 
-            z-index:
-                1000;
-
-            box-shadow:
-                0 3px 10px rgba(0, 0, 0, 0.12);
+            z-index: 1000;
         }
 
 
         .logo {
 
-            font-size:
-                24px;
+            font-size: 24px;
 
-            font-weight:
-                bold;
+            font-weight: bold;
         }
 
 
-        .nav-right {
+        .nav-links {
 
-            display:
-                flex;
+            display: flex;
 
-            align-items:
-                center;
+            gap: 20px;
 
-            gap:
-                20px;
+            align-items: center;
         }
 
 
-        .user-name {
+        .nav-links a {
 
-            font-size:
-                15px;
+            color: white;
+
+            text-decoration: none;
+
+            font-weight: 500;
+        }
+
+
+        .nav-links a:hover {
+
+            text-decoration: underline;
         }
 
 
         .logout-btn {
 
-            text-decoration:
-                none;
+            background: white;
 
-            color:
-                white;
+            color: #5f67a3 !important;
+
+            padding: 8px 15px;
+
+            border-radius: 20px;
+        }
+
+
+        /* =========================================================
+   HERO
+   ========================================================= */
+
+        .hero {
+
+            text-align: center;
+
+            padding: 50px 20px 35px;
 
             background:
-                rgba(255, 255, 255, 0.18);
-
-            padding:
-                9px 16px;
-
-            border-radius:
-                8px;
-
-            transition:
-                0.3s;
+                linear-gradient(135deg,
+                    #eef2ff,
+                    #ffffff);
         }
 
 
-        .logout-btn:hover {
+        .hero h1 {
 
-            background:
-                rgba(255, 255, 255, 0.3);
+            font-size: 38px;
+
+            color: #5f67a3;
+
+            margin-bottom: 10px;
         }
 
 
-        /* =================================================
-           MAIN
-           ================================================= */
+        .hero p {
 
-        .container {
+            color: #666;
 
-            width:
-                92%;
-
-            max-width:
-                1200px;
-
-            margin:
-                35px auto;
+            font-size: 17px;
         }
 
 
-        .welcome {
+        /* =========================================================
+   SEARCH
+   ========================================================= */
 
-            text-align:
-                center;
+        .search-section {
 
-            margin-bottom:
-                30px;
+            max-width: 900px;
+
+            margin: 25px auto;
+
+            padding: 20px;
+
+            text-align: center;
         }
 
-
-        .welcome h1 {
-
-            color:
-                #5f67a3;
-
-            margin-bottom:
-                8px;
-        }
-
-
-        .welcome p {
-
-            color:
-                #666;
-        }
-
-
-        /* =================================================
-           MESSAGES
-           ================================================= */
-
-        .message {
-
-            padding:
-                15px 18px;
-
-            border-radius:
-                10px;
-
-            margin-bottom:
-                20px;
-
-            text-align:
-                center;
-        }
-
-
-        .success-message {
-
-            background:
-                #e7f8ed;
-
-            color:
-                #24733b;
-
-            border:
-                1px solid #b9e8c7;
-        }
-
-
-        .error-message {
-
-            background:
-                #ffe9e9;
-
-            color:
-                #a33333;
-
-            border:
-                1px solid #f1bcbc;
-        }
-
-
-        /* =================================================
-           SEARCH
-           ================================================= */
 
         .search-box {
 
-            background:
-                white;
+            display: flex;
 
-            padding:
-                25px;
+            max-width: 700px;
 
-            border-radius:
-                16px;
+            margin: auto;
+
+            background: white;
+
+            border-radius: 35px;
+
+            padding: 7px;
 
             box-shadow:
-                0 5px 20px rgba(0, 0, 0, 0.08);
-
-            margin-bottom:
-                30px;
+                0 4px 15px rgba(0, 0, 0, 0.08);
         }
 
 
-        .search-box h2 {
+        .search-box input {
 
-            color:
-                #5f67a3;
+            flex: 1;
 
-            margin-bottom:
-                15px;
+            border: none;
 
-            text-align:
-                center;
+            outline: none;
+
+            padding: 14px 20px;
+
+            font-size: 16px;
+
+            border-radius: 30px;
         }
 
 
-        .search-area {
+        .search-box button {
 
-            display:
-                flex;
+            border: none;
 
-            gap:
-                10px;
+            background: #6f75b5;
 
-            max-width:
-                750px;
+            color: white;
 
-            margin:
-                auto;
+            padding: 0 25px;
+
+            border-radius: 30px;
+
+            cursor: pointer;
+
+            font-size: 15px;
         }
 
 
-        .search-area input {
+        .search-box button:hover {
 
-            flex:
-                1;
-
-            padding:
-                14px 18px;
-
-            border:
-                1px solid #d0d0d0;
-
-            border-radius:
-                10px;
-
-            font-size:
-                16px;
-
-            outline:
-                none;
+            background: #555c9d;
         }
 
 
-        .search-area input:focus {
+        /* =========================================================
+   CONTAINER
+   ========================================================= */
 
-            border-color:
-                #6f75b5;
+        .container {
+
+            width: 92%;
+
+            max-width: 1200px;
+
+            margin: auto;
         }
 
 
-        .search-area button {
+        /* =========================================================
+   TITLE
+   ========================================================= */
 
-            padding:
-                14px 25px;
+        .section-title {
 
-            border:
-                none;
+            text-align: center;
 
-            border-radius:
-                10px;
+            margin: 35px 0 20px;
 
-            background:
-                #6f75b5;
+            color: #5f67a3;
 
-            color:
-                white;
-
-            font-size:
-                16px;
-
-            cursor:
-                pointer;
+            font-size: 27px;
         }
 
 
-        .search-area button:hover {
-
-            background:
-                #5f67a3;
-        }
-
-
-        /* =================================================
-           RECOMMENDATIONS
-           ================================================= */
-
-        #recommendationSection {
-
-            display:
-                none;
-
-            margin-bottom:
-                45px;
-        }
-
-
-        .recommendation-title {
-
-            display:
-                flex;
-
-            justify-content:
-                space-between;
-
-            align-items:
-                center;
-
-            margin-bottom:
-                20px;
-        }
-
-
-        .recommendation-title h2 {
-
-            color:
-                #5f67a3;
-        }
-
-
-        #resultCount {
-
-            color:
-                #777;
-
-            font-size:
-                14px;
-        }
-
+        /* =========================================================
+   GRID
+   ========================================================= */
 
         .dog-grid {
 
-            display:
-                grid;
+            display: grid;
 
             grid-template-columns:
                 repeat(auto-fit,
-                    minmax(240px, 1fr));
+                    minmax(250px, 1fr));
 
-            gap:
-                22px;
+            gap: 25px;
+
+            margin-bottom: 35px;
         }
 
 
-        /* =================================================
-           DOG CARD
-           ================================================= */
+        /* =========================================================
+   DOG CARD
+   ========================================================= */
 
         .dog-card {
 
-            background:
-                white;
+            background: white;
 
-            border-radius:
-                16px;
+            border-radius: 15px;
 
-            overflow:
-                hidden;
+            overflow: hidden;
 
             box-shadow:
-                0 5px 18px rgba(0, 0, 0, 0.09);
+                0 5px 18px rgba(0, 0, 0, 0.08);
 
-            transition:
-                0.3s;
+            transition: 0.3s;
         }
 
 
@@ -1367,443 +1434,376 @@ if ($availableResult) {
                 translateY(-5px);
 
             box-shadow:
-                0 10px 25px rgba(0, 0, 0, 0.13);
+                0 8px 25px rgba(0, 0, 0, 0.12);
         }
 
 
+        /*
+ * IMPORTANT IMAGE CSS
+ */
+
         .dog-card img {
 
-            width:
-                100%;
+            width: 100%;
 
-            height:
-                220px;
+            height: 220px;
 
-            object-fit:
-                cover;
+            display: block;
 
-            display:
-                block;
+            object-fit: cover;
+
+            background: #eeeeee;
         }
 
 
         .dog-content {
 
-            padding:
-                18px;
+            padding: 18px;
         }
 
 
         .dog-content h3 {
 
-            color:
-                #5f67a3;
+            color: #5f67a3;
 
-            margin-bottom:
-                12px;
+            margin-bottom: 10px;
 
-            font-size:
-                20px;
+            font-size: 21px;
         }
 
 
-        .dog-info {
+        .dog-content p {
 
-            color:
-                #555;
+            margin: 6px 0;
 
-            margin:
-                7px 0;
-
-            font-size:
-                14px;
+            color: #555;
         }
 
 
-        .match-score {
+        .dog-content strong {
 
-            display:
-                inline-block;
-
-            margin-top:
-                10px;
-
-            padding:
-                5px 10px;
-
-            border-radius:
-                20px;
-
-            background:
-                #eef2ff;
-
-            color:
-                #5f67a3;
-
-            font-size:
-                12px;
-
-            font-weight:
-                bold;
+            color: #444;
         }
 
 
         .adopt-btn {
 
-            width:
-                100%;
+            width: 100%;
 
-            margin-top:
-                15px;
+            margin-top: 12px;
 
-            padding:
-                12px;
+            border: none;
 
-            border:
-                none;
+            padding: 11px;
 
-            border-radius:
-                8px;
+            border-radius: 8px;
 
-            background:
-                #6f75b5;
+            background: #6f75b5;
 
-            color:
-                white;
+            color: white;
 
-            font-size:
-                15px;
+            cursor: pointer;
 
-            cursor:
-                pointer;
+            font-size: 15px;
         }
 
 
         .adopt-btn:hover {
 
-            background:
-                #5f67a3;
+            background: #555c9d;
         }
 
 
-        /* =================================================
-           NO RESULT
-           ================================================= */
+        /* =========================================================
+   RECOMMENDATION
+   ========================================================= */
+
+        .recommendation-section {
+
+            background: #eef2ff;
+
+            padding: 30px 20px;
+
+            border-radius: 20px;
+
+            margin-top: 40px;
+
+            margin-bottom: 40px;
+
+            border: 1px solid #dfe3ff;
+        }
+
+
+        .recommendation-heading {
+
+            text-align: center;
+
+            color: #5f67a3;
+
+            margin-bottom: 8px;
+
+            font-size: 28px;
+        }
+
+
+        .recommendation-description {
+
+            text-align: center;
+
+            color: #666;
+
+            margin-bottom: 25px;
+        }
+
+
+        .score {
+
+            display: inline-block;
+
+            background: #e7eaff;
+
+            color: #5f67a3;
+
+            padding: 5px 10px;
+
+            border-radius: 15px;
+
+            font-size: 13px;
+
+            margin-top: 5px;
+        }
+
+
+        /* =========================================================
+   NO RESULT
+   ========================================================= */
 
         .no-result {
 
-            grid-column:
-                1 / -1;
+            text-align: center;
 
-            text-align:
-                center;
+            padding: 35px;
 
-            background:
-                white;
+            background: white;
 
-            padding:
-                35px;
+            border-radius: 15px;
 
-            border-radius:
-                12px;
+            color: #666;
 
-            color:
-                #666;
+            margin: 20px 0;
         }
 
 
-        /* =================================================
-           AVAILABLE DOGS
-           ================================================= */
+        /* =========================================================
+   FORM
+   ========================================================= */
 
-        .section-title {
+        .form-section {
 
-            color:
-                #5f67a3;
+            max-width: 700px;
 
-            margin-bottom:
-                20px;
-        }
+            margin: 50px auto;
 
+            background: white;
 
-        .available-section {
+            padding: 30px;
 
-            margin-bottom:
-                50px;
-        }
-
-
-        /* =================================================
-           ADOPTION FORM
-           ================================================= */
-
-        .adoption-section {
-
-            background:
-                white;
-
-            padding:
-                30px;
-
-            border-radius:
-                16px;
+            border-radius: 18px;
 
             box-shadow:
                 0 5px 20px rgba(0, 0, 0, 0.08);
-
-            margin-bottom:
-                50px;
         }
 
 
-        .adoption-section h2 {
+        .form-section h2 {
 
-            color:
-                #5f67a3;
+            text-align: center;
 
-            margin-bottom:
-                25px;
+            color: #5f67a3;
 
-            text-align:
-                center;
-        }
-
-
-        .form-grid {
-
-            display:
-                grid;
-
-            grid-template-columns:
-                1fr 1fr;
-
-            gap:
-                18px;
+            margin-bottom: 25px;
         }
 
 
         .form-group {
 
-            display:
-                flex;
-
-            flex-direction:
-                column;
-
-            gap:
-                7px;
-        }
-
-
-        .form-group.full {
-
-            grid-column:
-                1 / -1;
+            margin-bottom: 18px;
         }
 
 
         .form-group label {
 
-            font-weight:
-                bold;
+            display: block;
 
-            font-size:
-                14px;
+            margin-bottom: 7px;
 
-            color:
-                #444;
+            font-weight: bold;
+
+            color: #555;
         }
 
 
         .form-group input,
         .form-group textarea {
 
-            padding:
-                12px 14px;
+            width: 100%;
 
-            border:
-                1px solid #d0d0d0;
+            padding: 12px;
 
-            border-radius:
-                8px;
+            border: 1px solid #ddd;
 
-            font-size:
-                15px;
+            border-radius: 8px;
 
-            outline:
-                none;
-        }
+            outline: none;
 
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-
-            border-color:
-                #6f75b5;
+            font-size: 15px;
         }
 
 
         .form-group textarea {
 
-            min-height:
-                110px;
+            height: 100px;
 
-            resize:
-                vertical;
+            resize: vertical;
         }
 
 
-        .submit-btn {
+        .form-submit {
 
-            grid-column:
-                1 / -1;
+            width: 100%;
 
-            padding:
-                14px;
+            padding: 13px;
 
-            border:
-                none;
+            border: none;
 
-            border-radius:
-                9px;
+            border-radius: 8px;
 
-            background:
-                #6f75b5;
+            background: #6f75b5;
 
-            color:
-                white;
+            color: white;
 
-            font-size:
-                16px;
+            font-size: 16px;
 
-            cursor:
-                pointer;
+            cursor: pointer;
         }
 
 
-        .submit-btn:hover {
+        .form-submit:hover {
 
-            background:
-                #5f67a3;
+            background: #555c9d;
         }
 
 
-        /* =================================================
-           LOADING
-           ================================================= */
+        /* =========================================================
+   MESSAGE
+   ========================================================= */
 
-        .loading {
+        .message {
 
-            grid-column:
-                1 / -1;
+            max-width: 700px;
 
-            text-align:
-                center;
+            margin: 20px auto;
 
-            padding:
-                30px;
+            padding: 15px;
 
-            color:
-                #666;
+            border-radius: 8px;
+
+            text-align: center;
         }
 
 
-        /* =================================================
-           FOOTER
-           ================================================= */
+        .success {
+
+            background: #dff5e3;
+
+            color: #24743b;
+        }
+
+
+        .error {
+
+            background: #ffe1e1;
+
+            color: #a33;
+        }
+
+
+        /* =========================================================
+   FOOTER
+   ========================================================= */
 
         footer {
 
-            text-align:
-                center;
+            background: #5f67a3;
 
-            padding:
-                25px;
+            color: white;
 
-            background:
-                #5f67a3;
+            text-align: center;
 
-            color:
-                white;
+            padding: 20px;
 
-            margin-top:
-                30px;
+            margin-top: 50px;
         }
 
 
-        /* =================================================
-           MOBILE
-           ================================================= */
+        /* =========================================================
+   MOBILE
+   ========================================================= */
 
-        @media(max-width: 700px) {
+        @media (max-width: 700px) {
 
             .navbar {
 
-                padding:
-                    14px 20px;
+                padding: 15px 20px;
+
+                flex-direction: column;
+
+                gap: 12px;
             }
 
 
-            .nav-right {
+            .nav-links {
 
-                gap:
-                    8px;
+                gap: 10px;
+
+                flex-wrap: wrap;
+
+                justify-content: center;
             }
 
 
-            .user-name {
+            .hero h1 {
 
-                display:
-                    none;
+                font-size: 30px;
             }
 
 
-            .search-area {
+            .search-box {
 
-                flex-direction:
-                    column;
+                flex-direction: column;
+
+                background: transparent;
+
+                box-shadow: none;
+
+                gap: 10px;
             }
 
 
-            .search-area button {
+            .search-box input {
 
-                width:
-                    100%;
+                background: white;
+
+                box-shadow:
+                    0 3px 10px rgba(0, 0, 0, 0.08);
             }
 
 
-            .form-grid {
+            .search-box button {
 
-                grid-template-columns:
-                    1fr;
+                padding: 12px;
             }
 
-
-            .form-group.full {
-
-                grid-column:
-                    auto;
-            }
-
-
-            .submit-btn {
-
-                grid-column:
-                    auto;
-            }
-
-
-            .recommendation-title {
-
-                flex-direction:
-                    column;
-
-                align-items:
-                    flex-start;
-
-                gap:
-                    5px;
-            }
         }
     </style>
 
@@ -1820,14 +1820,33 @@ if ($availableResult) {
     <nav class="navbar">
 
         <div class="logo">
+
             🐾 Happy Tails
+
         </div>
 
-        <div class="nav-right">
 
-            <span class="user-name">
-                Welcome, <?= htmlspecialchars($userName) ?>
-            </span>
+        <div class="nav-links">
+
+            <a href="index.php">
+                Home
+            </a>
+
+            <a href="#available">
+                Available Dogs
+            </a>
+
+            <a href="#recommendations">
+                Recommendations
+            </a>
+
+            <a href="#adoption">
+                Adopt Dog
+            </a>
+
+            <a href="user_chatsupport.php">
+                Chat Support
+            </a>
 
             <a
                 href="logout.php"
@@ -1841,410 +1860,533 @@ if ($availableResult) {
 
 
     <!-- =====================================================
-     MAIN
+     HERO
      ===================================================== -->
 
-    <main class="container">
+    <section class="hero">
+
+        <h1>
+
+            Welcome,
+            <?php
+            echo htmlspecialchars(
+                $userName
+            );
+            ?>
+
+            🐶
+
+        </h1>
 
 
-        <div class="welcome">
+        <p>
 
-            <h1>
-                Find Your Perfect Companion 🐶
-            </h1>
+            Find your perfect furry companion
+            with Happy Tails.
 
-            <p>
-                Search for a dog and get recommendations based on your search.
-            </p>
+        </p>
 
-        </div>
+    </section>
 
 
-        <!-- =================================================
-         MESSAGES
-         ================================================= -->
+    <!-- =====================================================
+     SEARCH
+     ===================================================== -->
 
-        <?php if ($successMessage !== ''): ?>
+    <section class="search-section">
 
-            <div class="message success-message">
+        <h2 class="section-title">
 
-                <?= htmlspecialchars($successMessage) ?>
+            🔍 Search Dogs
 
-            </div>
+        </h2>
 
-        <?php endif; ?>
-
-
-        <?php if ($errorMessage !== ''): ?>
-
-            <div class="message error-message">
-
-                <?= htmlspecialchars($errorMessage) ?>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <!-- =================================================
-         SEARCH
-         ================================================= -->
 
         <div class="search-box">
 
-            <h2>
-                🔍 Search for a Dog
-            </h2>
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search by breed, age, size, gender...">
 
 
-            <div class="search-area">
+            <button
+                type="button"
+                onclick="performSearch()">
 
-                <input
-                    type="text"
-                    id="recommendationInput"
-                    placeholder="Search breed, age, size, gender..."
-                    autocomplete="off">
+                Search
 
-
-                <button
-                    type="button"
-                    onclick="searchDogs()">
-                    Search
-                </button>
-
-            </div>
+            </button>
 
         </div>
 
+    </section>
 
-        <!-- =================================================
-         RECOMMENDED DOGS
-         ================================================= -->
 
-        <section
-            id="recommendationSection">
+    <!-- =====================================================
+     SEARCH RESULTS
+     ===================================================== -->
 
-            <div class="recommendation-title">
+    <section
+        class="container"
+        id="searchResultsSection"
+        style="display:none;">
 
-                <h2>
-                    🐕 Recommended Dogs
-                </h2>
+        <h2 class="section-title">
 
-                <span id="resultCount"></span>
+            🔎 Search Results
 
-            </div>
+        </h2>
+
+
+        <div
+            id="searchResults"
+            class="dog-grid"></div>
+
+    </section>
+
+
+    <!-- =====================================================
+     RECOMMENDATIONS
+     ===================================================== -->
+
+    <section
+        class="container"
+        id="recommendations">
+
+        <div class="recommendation-section">
+
+            <h2 class="recommendation-heading">
+
+                🤖 Recommended Dogs
+
+            </h2>
+
+
+            <p class="recommendation-description">
+
+                Recommendations are calculated separately
+                using breed, age, size, gender and description.
+
+            </p>
 
 
             <div
                 id="recommendationResults"
-                class="dog-grid"></div>
+                class="dog-grid">
 
-        </section>
+                <div class="no-result">
 
-
-        <!-- =================================================
-         AVAILABLE DOGS
-         ================================================= -->
-
-        <section class="available-section">
-
-            <h2 class="section-title">
-                🐶 Available Dogs
-            </h2>
-
-
-            <div class="dog-grid">
-
-
-                <?php if (count($availableDogs) > 0): ?>
-
-
-                    <?php foreach ($availableDogs as $dog): ?>
-
-
-                        <div class="dog-card">
-
-
-                            <img
-                                src="<?= htmlspecialchars(
-                                            $dog['image_url'],
-                                            ENT_QUOTES,
-                                            'UTF-8'
-                                        ) ?>"
-                                alt="<?= htmlspecialchars(
-                                            $dog['dog_breed']
-                                        ) ?>"
-                                onerror="
-                                this.onerror=null;
-                                this.src='placeholder.jpg';
-                            ">
-
-
-                            <div class="dog-content">
-
-
-                                <h3>
-
-                                    <?= htmlspecialchars(
-                                        $dog['dog_breed']
-                                    ) ?>
-
-                                </h3>
-
-
-                                <div class="dog-info">
-
-                                    🐕 Age:
-                                    <?= htmlspecialchars(
-                                        $dog['age'] ?: 'N/A'
-                                    ) ?>
-
-                                </div>
-
-
-                                <div class="dog-info">
-
-                                    📏 Size:
-                                    <?= htmlspecialchars(
-                                        $dog['size'] ?: 'N/A'
-                                    ) ?>
-
-                                </div>
-
-
-                                <div class="dog-info">
-
-                                    ⚥ Gender:
-                                    <?= htmlspecialchars(
-                                        $dog['gender'] ?: 'N/A'
-                                    ) ?>
-
-                                </div>
-
-
-                                <?php if (!empty($dog['description'])): ?>
-
-                                    <div class="dog-info">
-
-                                        <?= htmlspecialchars(
-                                            strlen(
-                                                $dog['description']
-                                            ) > 100
-                                                ?
-                                                substr(
-                                                    $dog['description'],
-                                                    0,
-                                                    100
-                                                ) . '...'
-                                                :
-                                                $dog['description']
-                                        ) ?>
-
-                                    </div>
-
-                                <?php endif; ?>
-
-
-                                <button
-                                    type="button"
-                                    class="adopt-btn"
-                                    onclick="selectDog(
-                                    <?= (int)$dog['dog_id'] ?>,
-                                    <?= htmlspecialchars(
-                                        json_encode(
-                                            $dog['dog_breed']
-                                        ),
-                                        ENT_QUOTES,
-                                        'UTF-8'
-                                    ) ?>
-                                )">
-
-                                    Adopt This Dog
-
-                                </button>
-
-
-                            </div>
-
-                        </div>
-
-
-                    <?php endforeach; ?>
-
-
-                <?php else: ?>
-
-
-                    <div class="no-result">
-
-                        No dogs are currently available.
-
-                    </div>
-
-
-                <?php endif; ?>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- =================================================
-         ADOPTION FORM
-         ================================================= -->
-
-        <section
-            class="adoption-section"
-            id="adoptionForm">
-
-            <h2>
-                📝 Adoption Application
-            </h2>
-
-
-            <form
-                method="POST"
-                action="">
-
-
-                <div class="form-grid">
-
-
-                    <!-- Name -->
-
-                    <div class="form-group">
-
-                        <label>
-                            Full Name
-                        </label>
-
-                        <input
-                            type="text"
-                            name="owner_name"
-                            value="<?= htmlspecialchars(
-                                        $userName
-                                    ) ?>"
-                            required>
-
-                    </div>
-
-
-                    <!-- Email -->
-
-                    <div class="form-group">
-
-                        <label>
-                            Email Address
-                        </label>
-
-                        <input
-                            type="email"
-                            value="<?= htmlspecialchars(
-                                        $userEmail
-                                    ) ?>"
-                            readonly>
-
-                    </div>
-
-
-                    <!-- Phone -->
-
-                    <div class="form-group">
-
-                        <label>
-                            Phone Number
-                        </label>
-
-                        <input
-                            type="text"
-                            name="phone"
-                            placeholder="98XXXXXXXX"
-                            pattern="(97|98)[0-9]{8}"
-                            maxlength="10"
-                            required>
-
-                    </div>
-
-
-                    <!-- Dog -->
-
-                    <div class="form-group">
-
-                        <label>
-                            Dog to Adopt
-                        </label>
-
-                        <input
-                            type="hidden"
-                            id="dog_id"
-                            name="dog_id"
-                            required>
-
-
-                        <input
-                            type="text"
-                            id="dog_breed"
-                            name="dog_breed"
-                            placeholder="Select a dog above"
-                            readonly
-                            required>
-
-                    </div>
-
-
-                    <!-- Address -->
-
-                    <div class="form-group full">
-
-                        <label>
-                            Home Address
-                        </label>
-
-                        <textarea
-                            name="address"
-                            placeholder="Enter your complete address"
-                            required></textarea>
-
-                    </div>
-
-
-                    <!-- Reason -->
-
-                    <div class="form-group full">
-
-                        <label>
-                            Why do you want to adopt this dog?
-                        </label>
-
-                        <textarea
-                            name="reason"
-                            placeholder="Tell us why you want to adopt this dog..."
-                            required></textarea>
-
-                    </div>
-
-
-                    <!-- Submit -->
-
-                    <button
-                        type="submit"
-                        name="submit_adoption"
-                        class="submit-btn">
-
-                        Submit Adoption Application
-
-                    </button>
-
+                    Search for a dog to see recommendations.
 
                 </div>
 
-            </form>
+            </div>
 
-        </section>
+        </div>
+
+    </section>
 
 
-    </main>
+    <!-- =====================================================
+     AVAILABLE DOGS
+     ===================================================== -->
+
+    <section
+        class="container"
+        id="available">
+
+        <h2 class="section-title">
+
+            🐕 Available Dogs
+
+        </h2>
+
+
+        <div class="dog-grid">
+
+
+            <?php
+
+            if (
+                $dogsResult &&
+                $dogsResult->num_rows > 0
+            ):
+
+
+                while (
+                    $dog =
+                    $dogsResult->fetch_assoc()
+                ):
+
+
+                    $dogId =
+                        $dog['dog_id']
+                        ?? 0;
+
+
+                    $breed =
+                        $dog['dog_breed']
+                        ?? 'Unknown';
+
+
+                    $age =
+                        $dog['age']
+                        ?? 'Not specified';
+
+
+                    $size =
+                        $dog['size']
+                        ?? 'Not specified';
+
+
+                    $gender =
+                        $dog['gender']
+                        ?? 'Not specified';
+
+
+                    $description =
+                        $dog['description']
+                        ?? 'No description available.';
+
+
+                    /*
+                 * IMPORTANT
+                 */
+
+                    $image =
+                        getDogImagePath(
+                            $dog['dog_image']
+                                ?? ''
+                        );
+
+            ?>
+
+
+                    <div class="dog-card">
+
+
+                        <img
+                            src="<?php
+                                    echo htmlspecialchars(
+                                        $image
+                                    );
+                                    ?>"
+                            alt="<?php
+                                    echo htmlspecialchars(
+                                        $breed
+                                    );
+                                    ?>"
+                            onerror="
+                    this.onerror=null;
+                    this.src='placeholder.jpg';
+                ">
+
+
+                        <div class="dog-content">
+
+
+                            <h3>
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $breed
+                                );
+                                ?>
+
+                            </h3>
+
+
+                            <p>
+
+                                <strong>
+                                    Age:
+                                </strong>
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $age
+                                );
+                                ?>
+
+                            </p>
+
+
+                            <p>
+
+                                <strong>
+                                    Size:
+                                </strong>
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $size
+                                );
+                                ?>
+
+                            </p>
+
+
+                            <p>
+
+                                <strong>
+                                    Gender:
+                                </strong>
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $gender
+                                );
+                                ?>
+
+                            </p>
+
+
+                            <p>
+
+                                <?php
+                                echo htmlspecialchars(
+                                    $description
+                                );
+                                ?>
+
+                            </p>
+
+
+                            <button
+                                class="adopt-btn"
+                                onclick='selectDog(
+                        <?php
+                        echo json_encode(
+                            $dogId
+                        );
+                        ?>,
+                        <?php
+                        echo json_encode(
+                            $breed
+                        );
+                        ?>
+                    )'>
+
+                                Adopt This Dog
+
+                            </button>
+
+
+                        </div>
+
+                    </div>
+
+
+                <?php
+
+                endwhile;
+
+            else:
+
+                ?>
+
+
+                <div class="no-result">
+
+                    No dogs are currently available.
+
+                </div>
+
+
+            <?php
+
+            endif;
+
+            ?>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+     ADOPTION FORM
+     ===================================================== -->
+
+    <section
+        class="form-section"
+        id="adoption">
+
+        <h2>
+
+            🐾 Dog Adoption Application
+
+        </h2>
+
+
+        <?php
+
+        if (
+            $applicationMessage !== ''
+        ):
+
+        ?>
+
+
+            <div
+                class="message
+            <?php
+            echo $applicationSuccess
+                ? 'success'
+                : 'error';
+            ?>">
+
+                <?php
+
+                echo htmlspecialchars(
+                    $applicationMessage
+                );
+
+                ?>
+
+            </div>
+
+
+        <?php
+
+        endif;
+
+        ?>
+
+
+        <form method="POST">
+
+
+            <input
+                type="hidden"
+                name="dog_id"
+                id="dog_id">
+
+
+            <input
+                type="hidden"
+                name="dog_breed"
+                id="dog_breed">
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Full Name
+                </label>
+
+
+                <input
+                    type="text"
+                    name="owner_name"
+                    required
+                    value="<?php
+                            echo htmlspecialchars(
+                                $userName
+                            );
+                            ?>">
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Email Address
+                </label>
+
+
+                <input
+                    type="email"
+                    value="<?php
+                            echo htmlspecialchars(
+                                $userEmail
+                            );
+                            ?>"
+                    readonly>
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Phone Number
+                </label>
+
+
+                <input
+                    type="text"
+                    name="phone"
+                    required>
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Home Address
+                </label>
+
+
+                <textarea
+                    name="address"
+                    required></textarea>
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Dog to Adopt
+                </label>
+
+
+                <input
+                    type="text"
+                    id="selectedDog"
+                    readonly
+                    placeholder="Select a dog above">
+
+            </div>
+
+
+            <div class="form-group">
+
+
+                <label>
+                    Why do you want to adopt this dog?
+                </label>
+
+
+                <textarea
+                    name="reason"
+                    required
+                    placeholder="Explain why you want to adopt..."></textarea>
+
+            </div>
+
+
+            <button
+                type="submit"
+                name="submit_adoption"
+                class="form-submit">
+
+                Submit Adoption Application
+
+            </button>
+
+        </form>
+
+    </section>
 
 
     <!-- =====================================================
@@ -2253,543 +2395,22 @@ if ($availableResult) {
 
     <footer>
 
-        © <?= date('Y') ?>
-        Happy Tails Dog Adoption
+        <p>
+
+            ©
+            <?php echo date('Y'); ?>
+
+            Happy Tails Dog Adoption
+
+        </p>
 
     </footer>
 
 
-    <!-- =====================================================
-     JAVASCRIPT
-     ===================================================== -->
-
     <script>
-        /* =====================================================
-   SEARCH DOGS
-   ===================================================== */
-
-        function searchDogs() {
-
-            const input =
-                document.getElementById(
-                    "recommendationInput"
-                );
-
-
-            const section =
-                document.getElementById(
-                    "recommendationSection"
-                );
-
-
-            const results =
-                document.getElementById(
-                    "recommendationResults"
-                );
-
-
-            const count =
-                document.getElementById(
-                    "resultCount"
-                );
-
-
-            const keyword =
-                input.value.trim();
-
-
-            /* Empty search */
-
-            if (keyword === "") {
-
-                section.style.display =
-                    "none";
-
-                results.innerHTML =
-                    "";
-
-                count.innerHTML =
-                    "";
-
-                return;
-            }
-
-
-            /* Show section */
-
-            section.style.display =
-                "block";
-
-
-            /* Loading */
-
-            results.innerHTML = `
-
-        <div class="loading">
-
-            🔄 Finding recommended dogs...
-
-        </div>
-
-    `;
-
-
-            count.innerHTML =
-                "";
-
-
-            /*
-            =====================================================
-            AJAX REQUEST
-            =====================================================
-            */
-
-            fetch(
-                    "userdashboard.php?ajax_recommend=" +
-                    encodeURIComponent(keyword) +
-                    "&t=" +
-                    Date.now()
-                )
-
-
-                .then(function(response) {
-
-                    if (!response.ok) {
-
-                        throw new Error(
-                            "Server error: HTTP " +
-                            response.status
-                        );
-
-                    }
-
-
-                    return response.text();
-
-                })
-
-
-                .then(function(text) {
-
-                    console.log(
-                        "Recommendation response:",
-                        text
-                    );
-
-
-                    let data;
-
-
-                    try {
-
-                        data =
-                            JSON.parse(text);
-
-                    } catch (error) {
-
-                        console.error(
-                            "Invalid JSON:",
-                            text
-                        );
-
-
-                        throw new Error(
-                            "Server did not return valid JSON. Check PHP errors."
-                        );
-                    }
-
-
-                    /*
-                    =================================================
-                    ERROR
-                    =================================================
-                    */
-
-                    if (!data.success) {
-
-                        results.innerHTML = `
-
-                <div class="no-result">
-
-                    ❌
-                    ${escapeHtml(
-                        data.message ||
-                        "Unable to find dogs."
-                    )}
-
-                </div>
-
-            `;
-
-                        return;
-                    }
-
-
-                    /*
-                    =================================================
-                    COUNT
-                    =================================================
-                    */
-
-                    count.innerHTML =
-                        data.count +
-                        " dog(s) found";
-
-
-                    /*
-                    =================================================
-                    NO DOGS
-                    =================================================
-                    */
-
-                    if (
-                        !data.dogs ||
-                        data.dogs.length === 0
-                    ) {
-
-                        results.innerHTML = `
-
-                <div class="no-result">
-
-                    No dogs are currently available.
-
-                </div>
-
-            `;
-
-                        return;
-                    }
-
-
-                    /*
-                    =================================================
-                    CLEAR OLD RESULTS
-                    =================================================
-                    */
-
-                    results.innerHTML =
-                        "";
-
-
-                    /*
-                    =================================================
-                    CREATE CARDS
-                    =================================================
-                    */
-
-                    data.dogs.forEach(
-                        function(dog) {
-
-                            const card =
-                                document.createElement(
-                                    "div"
-                                );
-
-
-                            card.className =
-                                "dog-card";
-
-
-                            let description =
-                                dog.description ||
-                                "Friendly and lovable dog.";
-
-
-                            if (
-                                description.length > 100
-                            ) {
-
-                                description =
-                                    description.substring(
-                                        0,
-                                        100
-                                    ) +
-                                    "...";
-                            }
-
-
-                            let scoreHTML =
-                                "";
-
-
-                            if (
-                                Number(dog.score) > 0
-                            ) {
-
-                                scoreHTML = `
-
-                        <span class="match-score">
-
-                            ${dog.score}% Match
-
-                        </span>
-
-                    `;
-
-                            } else {
-
-                                scoreHTML = `
-
-                        <span class="match-score">
-
-                            Available Dog
-
-                        </span>
-
-                    `;
-                            }
-
-
-                            card.innerHTML = `
-
-                    <img
-                        src="${escapeHtml(
-                            dog.image_url
-                        )}"
-                        alt="${escapeHtml(
-                            dog.dog_breed
-                        )}"
-                        onerror="
-                            this.onerror=null;
-                            this.src='placeholder.jpg';
-                        "
-                    >
-
-
-                    <div class="dog-content">
-
-
-                        <h3>
-
-                            ${escapeHtml(
-                                dog.dog_breed
-                            )}
-
-                        </h3>
-
-
-                        <div class="dog-info">
-
-                            🐕 Age:
-                            ${escapeHtml(
-                                dog.age || "N/A"
-                            )}
-
-                        </div>
-
-
-                        <div class="dog-info">
-
-                            📏 Size:
-                            ${escapeHtml(
-                                dog.size || "N/A"
-                            )}
-
-                        </div>
-
-
-                        <div class="dog-info">
-
-                            ⚥ Gender:
-                            ${escapeHtml(
-                                dog.gender || "N/A"
-                            )}
-
-                        </div>
-
-
-                        <div class="dog-info">
-
-                            ${escapeHtml(
-                                description
-                            )}
-
-                        </div>
-
-
-                        ${scoreHTML}
-
-
-                        <button
-                            type="button"
-                            class="adopt-btn"
-                        >
-                            Adopt This Dog
-                        </button>
-
-
-                    </div>
-
-                `;
-
-
-                            /*
-                            =========================================
-                            ADOPT BUTTON
-                            =========================================
-                            */
-
-                            const button =
-                                card.querySelector(
-                                    ".adopt-btn"
-                                );
-
-
-                            button.addEventListener(
-                                "click",
-                                function() {
-
-                                    selectDog(
-                                        dog.dog_id,
-                                        dog.dog_breed
-                                    );
-
-                                }
-                            );
-
-
-                            results.appendChild(
-                                card
-                            );
-
-                        }
-                    );
-
-                })
-
-
-                /*
-                =====================================================
-                ERROR HANDLER
-                =====================================================
-                */
-
-                .catch(function(error) {
-
-                    console.error(
-                        "Recommendation error:",
-                        error
-                    );
-
-
-                    results.innerHTML = `
-
-            <div class="no-result">
-
-                ❌
-                Recommendation could not be loaded.
-
-                <br><br>
-
-                <small>
-
-                    ${escapeHtml(
-                        error.message
-                    )}
-
-                </small>
-
-            </div>
-
-        `;
-
-
-                    count.innerHTML =
-                        "";
-
-                });
-
-        }
-
-
-        /* =====================================================
-           ENTER KEY
-           ===================================================== */
-
-        document
-            .getElementById(
-                "recommendationInput"
-            )
-            .addEventListener(
-                "keydown",
-                function(event) {
-
-                    if (
-                        event.key === "Enter"
-                    ) {
-
-                        event.preventDefault();
-
-                        searchDogs();
-
-                    }
-
-                }
-            );
-
-
-        /* =====================================================
-           SELECT DOG
-           ===================================================== */
-
-        function selectDog(
-            dogId,
-            dogBreed
-        ) {
-
-            const dogIdInput =
-                document.getElementById(
-                    "dog_id"
-                );
-
-
-            const dogBreedInput =
-                document.getElementById(
-                    "dog_breed"
-                );
-
-
-            if (dogIdInput) {
-
-                dogIdInput.value =
-                    dogId;
-
-            }
-
-
-            if (dogBreedInput) {
-
-                dogBreedInput.value =
-                    dogBreed;
-
-            }
-
-
-            /*
-            Scroll to adoption form
-            */
-
-            const form =
-                document.getElementById(
-                    "adoptionForm"
-                );
-
-
-            if (form) {
-
-                form.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-
-            }
-
-        }
-
-
-        /* =====================================================
-           HTML ESCAPE
-           ===================================================== */
+        /* =========================================================
+   ESCAPE HTML
+   ========================================================= */
 
         function escapeHtml(value) {
 
@@ -2798,8 +2419,7 @@ if ($availableResult) {
                 value === undefined
             ) {
 
-                return "";
-
+                return '';
             }
 
 
@@ -2807,28 +2427,503 @@ if ($availableResult) {
 
                 .replace(
                     /&/g,
-                    "&amp;"
+                    '&amp;'
                 )
 
                 .replace(
                     /</g,
-                    "&lt;"
+                    '&lt;'
                 )
 
                 .replace(
                     />/g,
-                    "&gt;"
+                    '&gt;'
                 )
 
                 .replace(
                     /"/g,
-                    "&quot;"
+                    '&quot;'
                 )
 
                 .replace(
                     /'/g,
-                    "&#039;"
+                    '&#039;'
                 );
+        }
+
+
+        /* =========================================================
+           CREATE DOG CARD
+           ========================================================= */
+
+        function createDogCard(
+            dog,
+            showScore
+        ) {
+
+            const dogId =
+                dog.dog_id || 0;
+
+
+            const breed =
+                dog.dog_breed ||
+                'Unknown';
+
+
+            const age =
+                dog.age ||
+                'Not specified';
+
+
+            const size =
+                dog.size ||
+                'Not specified';
+
+
+            const gender =
+                dog.gender ||
+                'Not specified';
+
+
+            const description =
+                dog.description ||
+                'No description available.';
+
+
+            /*
+             * IMPORTANT
+             *
+             * Use image_url returned from PHP.
+             *
+             * Do NOT use dog.dog_image here.
+             */
+
+            const image =
+                dog.image_url ||
+                'placeholder.jpg';
+
+
+            let scoreHTML = '';
+
+
+            if (showScore) {
+
+                const score =
+                    dog.recommendation_score ||
+                    0;
+
+
+                scoreHTML = `
+
+            <span class="score">
+
+                Recommendation Score:
+                ${escapeHtml(score)}
+
+            </span>
+
+        `;
+            }
+
+
+            return `
+
+        <div class="dog-card">
+
+            <img
+                src="${escapeHtml(image)}"
+                alt="${escapeHtml(breed)}"
+                onerror="
+                    this.onerror=null;
+                    this.src='placeholder.jpg';
+                "
+            >
+
+
+            <div class="dog-content">
+
+                <h3>
+
+                    ${escapeHtml(breed)}
+
+                </h3>
+
+
+                <p>
+
+                    <strong>
+                        Age:
+                    </strong>
+
+                    ${escapeHtml(age)}
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Size:
+                    </strong>
+
+                    ${escapeHtml(size)}
+
+                </p>
+
+
+                <p>
+
+                    <strong>
+                        Gender:
+                    </strong>
+
+                    ${escapeHtml(gender)}
+
+                </p>
+
+
+                <p>
+
+                    ${escapeHtml(description)}
+
+                </p>
+
+
+                ${scoreHTML}
+
+
+                <button
+                    class="adopt-btn"
+                    onclick='selectDog(
+                        ${JSON.stringify(dogId)},
+                        ${JSON.stringify(breed)}
+                    )'
+                >
+
+                    Adopt This Dog
+
+                </button>
+
+
+            </div>
+
+        </div>
+
+    `;
+        }
+
+
+        /* =========================================================
+           SEARCH
+           ========================================================= */
+
+        function performSearch() {
+
+            const input =
+                document.getElementById(
+                    'searchInput'
+                );
+
+
+            const search =
+                input.value.trim();
+
+
+            if (search === '') {
+
+                alert(
+                    'Please enter something to search.'
+                );
+
+                return;
+            }
+
+
+            /*
+             * SEARCH ALGORITHM
+             */
+
+            fetch(
+                    window.location.pathname +
+                    '?ajax_search=' +
+                    encodeURIComponent(search) +
+                    '&t=' +
+                    Date.now()
+                )
+
+
+                .then(
+                    function(response) {
+
+                        return response.json();
+
+                    }
+                )
+
+
+                .then(
+                    function(data) {
+
+
+                        const section =
+                            document.getElementById(
+                                'searchResultsSection'
+                            );
+
+
+                        const results =
+                            document.getElementById(
+                                'searchResults'
+                            );
+
+
+                        section.style.display =
+                            'block';
+
+
+                        if (
+                            !data.success ||
+                            !data.dogs ||
+                            data.dogs.length === 0
+                        ) {
+
+
+                            results.innerHTML = `
+
+                    <div class="no-result">
+
+                        No dogs found for:
+
+                        <strong>
+                            ${escapeHtml(search)}
+                        </strong>
+
+                    </div>
+
+                `;
+
+
+                        } else {
+
+
+                            results.innerHTML =
+                                data.dogs
+                                .map(
+                                    function(dog) {
+
+                                        return createDogCard(
+                                            dog,
+                                            false
+                                        );
+
+                                    }
+                                )
+                                .join('');
+                        }
+
+
+                        /*
+                         * Load recommendations separately
+                         */
+
+                        loadRecommendations(
+                            search
+                        );
+
+                    }
+                )
+
+
+                .catch(
+                    function(error) {
+
+                        console.error(
+                            'Search Error:',
+                            error
+                        );
+
+
+                        document.getElementById(
+                            'searchResults'
+                        ).innerHTML = `
+
+                <div class="no-result">
+
+                    Search failed.
+
+                </div>
+
+            `;
+                    }
+                );
+
+        }
+
+
+        /* =========================================================
+           RECOMMENDATION
+           ========================================================= */
+
+        function loadRecommendations(
+            search
+        ) {
+
+            /*
+             * RECOMMENDATION ALGORITHM
+             */
+
+            fetch(
+                    window.location.pathname +
+                    '?ajax_recommend=' +
+                    encodeURIComponent(search) +
+                    '&t=' +
+                    Date.now()
+                )
+
+
+                .then(
+                    function(response) {
+
+                        return response.json();
+
+                    }
+                )
+
+
+                .then(
+                    function(data) {
+
+
+                        const box =
+                            document.getElementById(
+                                'recommendationResults'
+                            );
+
+
+                        if (
+                            !data.success ||
+                            !data.dogs ||
+                            data.dogs.length === 0
+                        ) {
+
+
+                            box.innerHTML = `
+
+                    <div class="no-result">
+
+                        No recommended dogs
+                        found for this search.
+
+                    </div>
+
+                `;
+
+
+                            return;
+                        }
+
+
+                        box.innerHTML =
+                            data.dogs
+                            .map(
+                                function(dog) {
+
+                                    return createDogCard(
+                                        dog,
+                                        true
+                                    );
+
+                                }
+                            )
+                            .join('');
+
+                    }
+                )
+
+
+                .catch(
+                    function(error) {
+
+                        console.error(
+                            'Recommendation Error:',
+                            error
+                        );
+
+
+                        document.getElementById(
+                            'recommendationResults'
+                        ).innerHTML = `
+
+                <div class="no-result">
+
+                    Unable to load recommendations.
+
+                </div>
+
+            `;
+                    }
+                );
+
+        }
+
+
+        /* =========================================================
+           ENTER KEY
+           ========================================================= */
+
+        document
+            .getElementById(
+                'searchInput'
+            )
+            .addEventListener(
+                'keypress',
+                function(event) {
+
+                    if (
+                        event.key === 'Enter'
+                    ) {
+
+                        event.preventDefault();
+
+                        performSearch();
+                    }
+
+                }
+            );
+
+
+        /* =========================================================
+           SELECT DOG
+           ========================================================= */
+
+        function selectDog(
+            dogId,
+            breed
+        ) {
+
+            document.getElementById(
+                    'dog_id'
+                ).value =
+                dogId;
+
+
+            document.getElementById(
+                    'dog_breed'
+                ).value =
+                breed;
+
+
+            document.getElementById(
+                    'selectedDog'
+                ).value =
+                breed;
+
+
+            document.getElementById(
+                'adoption'
+            ).scrollIntoView({
+                behavior: 'smooth'
+            });
 
         }
     </script>
