@@ -33,7 +33,7 @@
         </div>
 
         <div class="header-actions">
-            <a href="#" class="donate-btn"> <i class="fa-regular fa-heart"></i><strong>Donate</strong></a>
+            <!-- <a href="#" class="donate-btn"> <i class="fa-regular fa-heart"></i><strong>Donate</strong></a> -->
             <a href="login.php" class="donate-btn"><i class="fa-regular fa-user"></i> <strong>Log In</strong></a>
             <!-- Hamburger -->
             <button
